@@ -1689,3 +1689,48 @@ Stable rollback:
 - `stable-p7` remains pinned to `6c4f829f04b4dd4a0fd4f91dfc1b3d802c2e947e`;
 - `main` remains untouched on P7;
 - all P8 memory work remains isolated on `memory-p8-experiments`.
+
+
+---
+
+## P8D runtime result — lazy Pro construction works; in-process UI high-water remains
+
+Status: ON-DEVICE TESTED.
+
+Measured on MacBook Air M1 / macOS Sequoia:
+- fresh launch, Settings never opened: main process about **20 MB**;
+- opening Settings in **"Основное"**: about **30 MB**;
+- switching to **"Все"**: about **40-42 MB**;
+- closing Settings after Pro was touched and waiting: about **37 MB**;
+- persistent resource-guard helper remains separate at roughly **2.7-2.9 MB**.
+
+What this proves:
+- P8D successfully avoids eagerly constructing the Pro tree on the common simple-settings path:
+  simple Settings now costs roughly +10 MB instead of immediately first-touching the 40+ MB Pro state;
+- first-touching the full Pro UI adds another roughly 10-12 MB;
+- after Pro has been instantiated once, closing the window plus P8C malloc pressure relief still leaves
+  a process-wide AppKit high-water mark around 37 MB.
+
+Important architectural conclusion:
+- the cold/background engine itself is now near **20 MB**;
+- the remaining post-close gap is not coming from the compact dictionaries and is no longer explained
+  by a retained SettingsWindowController alone;
+- it is predominantly process-global AppKit/Dock/UI first-touch state. In particular Settings also
+  intentionally switches the LSUIElement agent to `.regular` via `DockPresence.acquire(.settings)`
+  while the window is open, which first-touches Dock/application UI infrastructure in the same process;
+- returning to `.accessory` on close does not unload those frameworks/caches.
+
+Decision point:
+- further in-process micro-trimming is expected to have diminishing returns;
+- preserving the exact same Settings UI **and** returning the background process to its ~20 MB cold
+  footprint after Settings closes requires a process boundary (Settings in a short-lived helper process)
+  or a controlled app restart after closing Settings;
+- a helper process is the cleaner no-feature-loss architecture, but it requires explicit cross-process
+  settings propagation and live side-effect reconciliation, so it should be a new isolated experiment
+  rather than folded into P8D.
+
+Stable state:
+- `stable-p7` remains the known-good rollback baseline;
+- P8B compact exact lexicons are the confirmed largest safe RAM win;
+- P8C allocator relief and P8D lazy Pro construction remain on `memory-p8-experiments`;
+- do not merge the experimental RAM branch into `main` until the desired architecture is chosen.
