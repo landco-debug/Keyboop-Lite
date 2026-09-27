@@ -929,3 +929,31 @@ Next:
 - grant Accessibility when requested;
 - do not manually add Lite to Input Monitoring for the core test;
 - verify real RU/EN auto-switching, TypoFix and Autoreplace before any further trimming.
+
+
+---
+
+## Build Probe P5 — runtime permission/install repair
+
+Status: TRIGGERED by this commit.
+
+Source under test:
+- `9ba58d4fd63106e235b59d308802da702f463a39`.
+
+Purpose:
+- compile exactly the P5A runtime fix after the failed P4 on-device checkpoint;
+- verify the translocated-singleton takeover and Lite-only Accessibility permission path compile cleanly;
+- repackage the canonical Lite APPL bundle metadata;
+- confirm heavy removed frameworks remain absent.
+
+CI rule:
+- this commit changes `.github/BUILD_LITE_TRIGGER` intentionally;
+- no other Actions probe should be launched until this run is inspected.
+
+Success gate:
+1. dictionary restore succeeds;
+2. arm64 Swift compile succeeds;
+3. code signing / strict verification succeeds;
+4. linkage still has no Whisper, FluidAudio, Sparkle or Translation framework;
+5. artifact uploads;
+6. only then hand the P5 artifact to the user for a fresh /Applications runtime test.
