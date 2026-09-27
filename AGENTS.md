@@ -832,3 +832,46 @@ Current hand-off:
 - `main` contains the first successfully built surgical Lite line;
 - next work should be runtime/UI verification and memory measurement before more removal;
 - do not continue trimming blindly after a successful build.
+
+
+---
+
+## Continuation Audit A2 — chat-limit hand-off and P4 artifact gate
+
+Status: VERIFIED in the continuation chat after the previous chat hit its limit.
+
+Live repository state rechecked:
+- `main` = `527ea5f6bf2188fdad2792538f673375f6c6c7b6` before this documentation commit;
+- `surgical-upstream-0.4.10` was at the same commit;
+- `legacy-rewrite-DO-NOT-USE` remains frozen at `53fc5767952c6e289b67c75704b38bf168e97fca`;
+- the successful P4 binary itself was built from source commit `fa15c929ba2c7d2527135c6e3bff2221ac727cad`;
+- P4 workflow run: `36320184183`;
+- P4 artifact ID: `10931982187`, artifact name `Keyboop-Lite-macOS-Apple-Silicon`.
+
+Artifact audit:
+- GitHub artifact download is intact and not expired at the time of this audit;
+- outer Actions artifact: 2,594,387 bytes;
+- it contains the packaged `Keyboop-Lite.zip`;
+- packaged app is `Keyboop Lite.app`, arm64 Mach-O;
+- executable is about 2.7 MB; unpacked bundle is about 8.6 MB because retained dictionaries/resources dominate the bundle;
+- `Info.plist` identifies version `0.4.10-lite`, minimum macOS 15.0, `LSUIElement=true`;
+- no heavy framework is linked according to the successful P4 linkage check.
+
+Important cleanup observation:
+- the arm64 executable still contains some user-facing strings mentioning removed voice/translation/model features;
+- these strings come from retained upstream source files such as About/changelog/settings text and are not evidence that Whisper, FluidAudio, Sparkle or Apple Translation frameworks are linked or initialized;
+- treat this only as a later binary/dead-text cleanup opportunity, not as a reason to resume blind source cutting before runtime verification.
+
+Hard gate before further optimization:
+1. install/run the exact P4 artifact on the target MacBook Air M1 / macOS Sequoia;
+2. verify original-looking retained Settings UI;
+3. verify automatic RU/EN switching with a real mistyped-layout sample;
+4. verify TypoFix/spell correction;
+5. verify Autoreplace/snippets;
+6. close Settings and measure steady-state RAM;
+7. only after those checks, make the next small surgical cleanup batch.
+
+Process rule remains:
+- no new compiler-probe loop until the runtime checkpoint is reported;
+- ordinary documentation/source commits must not trigger Actions;
+- after every future code commit, update this hand-off journal and keep `main` plus `surgical-upstream-0.4.10` synchronized.
