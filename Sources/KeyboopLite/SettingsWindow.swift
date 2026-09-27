@@ -1,6 +1,5 @@
 import AppKit
 import ApplicationServices
-import ObjectiveC
 import ServiceManagement
 
 private final class ClosureCheckbox: NSButton {
@@ -73,16 +72,16 @@ private class StackVC: NSViewController {
     }
 
     func addTitle(_ text: String) {
-        let l = NSTextField(labelWithString: text)
-        l.font = .boldSystemFont(ofSize: 22)
-        stack.addArrangedSubview(l)
+        let label = NSTextField(labelWithString: text)
+        label.font = .boldSystemFont(ofSize: 22)
+        stack.addArrangedSubview(label)
     }
 
     func addNote(_ text: String) {
-        let l = NSTextField(wrappingLabelWithString: text)
-        l.textColor = .secondaryLabelColor
-        l.maximumNumberOfLines = 3
-        stack.addArrangedSubview(l)
+        let label = NSTextField(wrappingLabelWithString: text)
+        label.textColor = .secondaryLabelColor
+        label.maximumNumberOfLines = 3
+        stack.addArrangedSubview(label)
     }
 }
 
@@ -92,10 +91,10 @@ private final class SwitchingVC: StackVC {
         let s = AppSettings.shared
         addTitle("Переключение")
         addNote("Автоматически исправляет слово, набранное в неверной RU/EN раскладке.")
-        stack.addArrangedSubview(checkbox("Автопереключение", value: s.autoEnabled) { s.autoEnabled = $0 })
-        stack.addArrangedSubview(checkbox("Срабатывать по пробелу", value: s.autoSpace) { s.autoSpace = $0 })
-        stack.addArrangedSubview(checkbox("Срабатывать по Enter", value: s.autoEnter) { s.autoEnter = $0 })
-        stack.addArrangedSubview(checkbox("Срабатывать по Tab", value: s.autoTab) { s.autoTab = $0 })
+        stack.addArrangedSubview(checkbox("Автопереключение", value: s.autoEnabled, action: { s.autoEnabled = $0 }))
+        stack.addArrangedSubview(checkbox("Срабатывать по пробелу", value: s.autoSpace, action: { s.autoSpace = $0 }))
+        stack.addArrangedSubview(checkbox("Срабатывать по Enter", value: s.autoEnter, action: { s.autoEnter = $0 }))
+        stack.addArrangedSubview(checkbox("Срабатывать по Tab", value: s.autoTab, action: { s.autoTab = $0 }))
     }
 }
 
@@ -143,24 +142,34 @@ private final class AutoreplaceVC: StackVC {
         stack.addArrangedSubview(makeScroll(replacements, height: 120))
 
         let row = NSStackView(views: [
-            checkbox("Пробел", value: s.snippetExpandSpace) { s.snippetExpandSpace = $0 },
-            checkbox("Enter", value: s.snippetExpandEnter) { s.snippetExpandEnter = $0 },
-            checkbox("Tab", value: s.snippetExpandTab) { s.snippetExpandTab = $0 }
+            checkbox("Пробел", value: s.snippetExpandSpace, action: { s.snippetExpandSpace = $0 }),
+            checkbox("Enter", value: s.snippetExpandEnter, action: { s.snippetExpandEnter = $0 }),
+            checkbox("Tab", value: s.snippetExpandTab, action: { s.snippetExpandTab = $0 })
         ])
         row.orientation = .horizontal
         row.spacing = 14
         stack.addArrangedSubview(row)
 
-        stack.addArrangedSubview(checkbox("Вставлять без форматирования (⇧⌘V)", value: s.plainPaste) { s.plainPaste = $0 }))
-        stack.addArrangedSubview(checkbox("Исправлять опечатки", value: s.typoFix) { s.typoFix = $0 }))
-        stack.addArrangedSubview(checkbox("Две заглавные подряд", value: s.twoCapsFix) { s.twoCapsFix = $0 }))
-        stack.addArrangedSubview(checkbox("Менять регистр выделенного (⌃⌥U)", value: s.caseChangeEnabled) { s.caseChangeEnabled = $0 }))
+        stack.addArrangedSubview(
+            checkbox("Вставлять без форматирования (⇧⌘V)", value: s.plainPaste, action: { s.plainPaste = $0 })
+        )
+        stack.addArrangedSubview(
+            checkbox("Исправлять опечатки", value: s.typoFix, action: { s.typoFix = $0 })
+        )
+        stack.addArrangedSubview(
+            checkbox("Две заглавные подряд", value: s.twoCapsFix, action: { s.twoCapsFix = $0 })
+        )
+        stack.addArrangedSubview(
+            checkbox("Менять регистр выделенного (⌃⌥U)", value: s.caseChangeEnabled, action: { s.caseChangeEnabled = $0 })
+        )
 
         addNote("Сниппеты: название = текст. При включении: ⌃⌥S, затем цифра 1–9.")
         snippets.font = .systemFont(ofSize: 13)
         snippets.string = TextSnippetStore.shared.pairs.map { "\($0.0) = \($0.1)" }.joined(separator: "\n")
         stack.addArrangedSubview(makeScroll(snippets, height: 90))
-        stack.addArrangedSubview(checkbox("Вставлять сниппет по сочетанию", value: s.snippetPickEnabled) { s.snippetPickEnabled = $0 }))
+        stack.addArrangedSubview(
+            checkbox("Вставлять сниппет по сочетанию", value: s.snippetPickEnabled, action: { s.snippetPickEnabled = $0 })
+        )
 
         let save = NSButton(title: "Сохранить списки", target: self, action: #selector(saveNow))
         stack.addArrangedSubview(save)
@@ -202,14 +211,18 @@ private final class GeneralVC: StackVC {
 
         if #available(macOS 13.0, *) {
             let enabled = SMAppService.mainApp.status == .enabled
-            stack.addArrangedSubview(checkbox("Запускать при входе в систему", value: enabled) { on in
+            let launch = checkbox("Запускать при входе в систему", value: enabled, action: { on in
                 do {
-                    if on { try SMAppService.mainApp.register() }
-                    else { try SMAppService.mainApp.unregister() }
+                    if on {
+                        try SMAppService.mainApp.register()
+                    } else {
+                        try SMAppService.mainApp.unregister()
+                    }
                 } catch {
                     NSSound.beep()
                 }
-            }))
+            })
+            stack.addArrangedSubview(launch)
         }
     }
 

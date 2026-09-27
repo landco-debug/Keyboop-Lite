@@ -210,3 +210,31 @@ Next:
 - push a tiny CI-bootstrap branch and open a PR if no push run appears;
 - inspect exact compiler errors from the hosted macOS runner;
 - fix only evidence-backed failures in the next documented commit.
+
+
+---
+
+## Commit 4 — fix nested trailing-closure parse failure
+
+Status: IMPLEMENTED, CI pending.
+
+Evidence:
+- GitHub Actions run `36312219357` on commit `499bc45f...` failed in `SettingsWindow.swift`.
+- Swift parsed trailing closures inside nested `stack.addArrangedSubview(checkbox(...){...})` calls as belonging to the outer call, producing "consecutive statements on a line must be separated by ';'".
+
+Files changed:
+- `Sources/KeyboopLite/SettingsWindow.swift`
+- `AGENTS.md`
+
+Fix:
+- every checkbox callback now uses the explicit `action:` argument instead of nested trailing-closure syntax;
+- launch-at-login checkbox is built into a local variable before being added to the stack;
+- unused ObjectiveC import removed.
+
+Build/test:
+- exact failure from run 1 addressed.
+- run 2 was already in flight from commit 3 when this fix was authored and may still report the same parser error because it predates this commit.
+
+Next:
+- wait for the CI run triggered by this commit;
+- inspect the next exact compiler failure, if any, and fix only that failure.
