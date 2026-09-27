@@ -1,40 +1,95 @@
-# Keyboop Lite
+# Keyboop
 
-A deliberately small Apple-Silicon build of Keyboop focused on:
+> **wrong layout? keyboop.**
+> Бесплатный open-source переключатель раскладки для macOS, который чинит
+> кракозябры — и при этом **не трогает твой буфер обмена**. А ещё набирает
+> текст голосом. Целиком на твоём Mac.
 
-- automatic RU/EN layout correction;
-- exceptions;
-- autoreplace;
-- typo correction;
-- two-leading-capitals correction;
-- plain-text paste;
-- selection case toggle;
-- explicit text snippets.
+Набрал `ghbdtn` вместо `привет`? Keyboop молча всё расколдует — прямо во время
+набора или по границе слова. Не угадал — поправь хоткеем: последнее слово,
+последние N слов или всё, что настучал за последние T секунд. Плюс автозамена
+сниппетов и локальная диктовка.
 
-## What is intentionally absent
+## Чем отличается
 
-No voice dictation, Whisper, Parakeet, FluidAudio, audio capture, translation, call recording,
-voice history, model downloaders, Sparkle, WebView, Electron or Tauri.
+- 🧼 **Не ломает буфер обмена.** Главная болезнь Punto Switcher — clipboard.
+  Keyboop печатает исправленный текст напрямую, буфер не трогает вообще.
+- 🎙 **Голосовой набор — локально.** Whisper и Parakeet (Neural Engine) на твоём
+  Mac: зажал хоткей, продиктовал, отпустил — текст на месте. Ни байта в сеть.
+- 🌐 **Перевод выделенного.** ⌃⌥T — перевод встаёт на место выделения, через
+  Apple Translation, тоже на устройстве (macOS 15+).
+- ⏪ **Гибкое окно отката.** Не только последнее слово, а N слов / фраза / время —
+  одним хоткеем. Этого нет ни у кого.
+- ✍️ **Сниппеты.** Набрал сокращение — получил e-mail, подпись, любую фразу.
+  Раскладка и регистр не важны.
+- 🔒 **Локально и приватно.** Из того, что ты печатаешь и говоришь, наружу не
+  уходит ничего. Open source — можно проверить каждое слово.
+- 🍎 **Современно.** Apple Silicon, нотаризовано Apple, автообновления, свой
+  канал фидбэка прямо из приложения.
 
-The runtime uses AppKit/CoreGraphics/Carbon only where needed.
+## Установка
 
-## Memory-oriented design
+Скачай DMG на **[keyboop.com](https://keyboop.com)** — перетащи в Программы,
+разреши доступ к клавиатуре, для голоса выбери модель. Обновляется само.
 
-The large RU/EN word lists are converted at build time to sorted UTF-8 line files and memory-mapped
-at runtime. Keyboop Lite keeps only compact UInt32 line offsets instead of decoding hundreds of
-thousands of Swift String objects into Set<String>.
+Требуется: **Apple Silicon (M1 и новее) — macOS 14+**, либо **Intel — macOS 13+**.
+На Intel работает всё, кроме движка распознавания Parakeet: он живёт на нейропроцессоре
+Apple, которого в Intel-маках нет. Голосовой набор там идёт через Whisper на процессоре,
+медленнее и теплее, поэтому в настройках подскажем выбрать модель полегче.
 
-The RU/EN trigram probability tables are also converted at build time. Each trigram is stored as one
-fixed 16-byte record (three Unicode scalar values + one Float32 probability), sorted and memory-mapped.
-Lookup is allocation-free binary search; there is no resident [String: Double] trigram dictionary.
+## Сборка из исходников
 
-## Build
+Нужны Xcode Command Line Tools и три внешние зависимости — их код чужой, в этот
+репозиторий он не входит, положи рядом в `vendor/`:
 
-GitHub Actions builds the arm64 app. The build runs a deterministic self-test before packaging and
-fails if heavy frameworks such as AVFoundation, CoreML, SwiftUI, Translation, Sparkle, FluidAudio,
-Whisper or ggml leak into the linked executable.
+```bash
+mkdir -p vendor && cd vendor
 
-A local build requires the Apple Swift toolchain, but users do not need Xcode or Command Line Tools
-to run the produced artifact.
+# 1. whisper.cpp — распознавание речи.
+git clone https://github.com/ggml-org/whisper.cpp
+cd whisper.cpp
+cmake -B build-macos14 -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 -DCMAKE_BUILD_TYPE=Release \
+  -DBUILD_SHARED_LIBS=OFF -DWHISPER_BUILD_EXAMPLES=OFF -DWHISPER_BUILD_TESTS=OFF \
+  -DWHISPER_BUILD_SERVER=OFF
+cmake --build build-macos14 -j
+cd ..
+```
 
-Upstream baseline: iffuno/keyboop 0.4.10 @ fb9bdde4eb8f13a486974cf102a8bec9d607e5d2.
+⚠️ Флаг `CMAKE_OSX_DEPLOYMENT_TARGET=14.0` обязателен. Без него cmake берёт версию
+той системы, на которой ты собираешь, и `ggml-metal` жёстко связывается с классом из
+macOS 15 — на macOS 14 приложение молча умрёт ещё до `main()`. Проверено на живых
+пользователях, чинилось экстренным релизом.
+
+Ещё две:
+
+- **Sparkle** (автообновления) → `vendor/sparkle/Sparkle.framework` —
+  [релизы](https://github.com/sparkle-project/Sparkle/releases)
+- **FluidAudio** (Parakeet на Neural Engine) → `vendor/fluidaudio-prebuilt/` со
+  `libFluidAudio.a`, `Modules/` и `include/` —
+  [исходники](https://github.com/FluidInference/FluidAudio)
+
+Дальше:
+
+```bash
+bash build-app.sh      # dev-сборка (self-signed) → Keyboop.app
+bash install-local.sh  # то же + установка в /Applications
+```
+
+Готовые релизы подписаны Developer ID и нотаризованы Apple — скрипт релиза завязан
+на личные ключи и в репозиторий не входит.
+
+## Авторы
+
+**Ivan Smetanin** — идея, продукт, руки и все опечатки в этом репозитории.
+
+**Claude (Anthropic)** — соавтор кода. Единственный участник проекта, который
+физически не способен набрать «ghbdtn», — именно поэтому ему и доверили это чинить.
+
+Да, программу для исправления человеческого ввода писали человек и нейросеть:
+один печатает с ошибками, второй не печатает вообще. Вместе — как раз одна
+полноценная клавиатура. Ирония замечена, задокументирована и оставлена в проде.
+
+## Лицензия
+
+MIT. Бесплатно — для всех, кто живёт на нескольких раскладках. А если в
+остальной галактике тоже мучаются с кракозябрами — и для них.
