@@ -1547,3 +1547,41 @@ Runtime gate:
 3. check whether main-process memory now falls materially below P8B's post-close ~39.7 MB;
 4. reopen Settings and verify identical UI/state;
 5. verify auto-switch, TypoFix, Autoreplace/snippets and manual hotkeys.
+
+
+---
+
+## Build Probe P8C Result — Settings heap relief artifact
+
+Status: SUCCESS.
+
+Evidence:
+- workflow run `36332844751`;
+- job `108657980485`;
+- source commit `b15fa2180569483341a784ff7291a6925d20ad18`;
+- artifact ID `10936610849`, name `Keyboop-Lite-macOS-Apple-Silicon`;
+- artifact size: 3,362,674 bytes;
+- compact lexicons regenerated successfully:
+  - RU 162,760 words;
+  - EN 59,276 words;
+- all 67 retained Swift sources compiled;
+- signing verification, packaging and artifact upload succeeded;
+- removed heavy frameworks remain absent.
+
+What P8C specifically tests:
+- P8B cold-memory win remains intact;
+- closed Settings controller is still released as in P8A;
+- two seconds after close, when Settings has not been reopened, Lite asks libmalloc to return
+  already-free pages to the OS via `malloc_zone_pressure_relief(nil, 0)`;
+- runtime log records bytes actually released and elapsed milliseconds.
+
+On-device comparison target:
+- P8B cold main: **21.7 MB**;
+- P8B after Settings close + minutes idle: **39.7 MB**;
+- P8C is successful only if the post-close figure falls materially from that ~39.7 MB level without
+  breaking reopening or any retained input feature.
+
+Stable rollback remains unchanged:
+- `stable-p7` -> `6c4f829f04b4dd4a0fd4f91dfc1b3d802c2e947e`;
+- `main` remains on P7;
+- RAM experiments remain isolated on `memory-p8-experiments`.
