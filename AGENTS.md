@@ -312,3 +312,21 @@ Expected result:
 - compilation may fail; that is acceptable for P1;
 - no source/product behavior is changed by this probe;
 - next commit must address only the concrete unresolved symbols reported by this run.
+
+
+---
+
+## Build Probe P1 result / Surgical micro-step S4A
+
+P1 result: FAILED as expected, but with a single concrete first blocker:
+- `LiveDraftEngine.swift` imports `FluidAudio`;
+- this file belongs exclusively to live voice-dictation draft rendering and is outside Lite scope.
+
+Action:
+- removed `LiveDraftEngine.swift` from the exact Lite source allow-list;
+- no retained switching/autoreplace source was changed;
+- no shim or FluidAudio dependency was added.
+
+Next probe:
+- trigger `probe-p2`;
+- stop again at the next compiler-reported dependency rather than batching speculative removals.

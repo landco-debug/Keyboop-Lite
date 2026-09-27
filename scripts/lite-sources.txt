@@ -36,7 +36,6 @@ Sources/Keyboop/LayoutCycle.swift
 Sources/Keyboop/LayoutData.swift
 Sources/Keyboop/LayoutDetector.swift
 Sources/Keyboop/LayoutManager.swift
-Sources/Keyboop/LiveDraftEngine.swift
 Sources/Keyboop/Logger.swift
 Sources/Keyboop/MenuBarController.swift
 Sources/Keyboop/NumericTypoRule.swift
