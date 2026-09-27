@@ -1734,3 +1734,79 @@ Stable state:
 - P8B compact exact lexicons are the confirmed largest safe RAM win;
 - P8C allocator relief and P8D lazy Pro construction remain on `memory-p8-experiments`;
 - do not merge the experimental RAM branch into `main` until the desired architecture is chosen.
+
+
+---
+
+## Stability review after P8D — settings helper/restart rejected for release path
+
+Status: REVIEWED; stability-first direction chosen.
+
+User priority:
+- minimize the probability of glitches, freezes, typing latency or missed corrections;
+- RAM reduction must not come at the expense of the keyboard/event-tap path.
+
+Re-check of the proposed separate Settings process:
+- **not selected as the next production architecture** despite its theoretical RAM advantage;
+- the current Settings UI does more than write passive preferences: controls trigger live side effects
+  such as Caps/Globe reconciliation, Caps LED, menu/icon refresh, language/menu notifications,
+  login-item changes, hotkey state and other process-owned behavior;
+- moving the same UI to another process would require a real IPC contract and centralizing all side
+  effects back in the engine process. A simple shared-UserDefaults helper would risk stale cached state,
+  duplicated system mutations and settings that visually change but are not applied live;
+- that is a substantially larger regression surface than the ~17 MB post-Pro high-water mark justifies.
+
+Re-check of "restart after closing Settings":
+- rejected for the same stability goal;
+- restarting necessarily tears down and recreates the CGEventTap/singleton/resource-guard lifecycle;
+- even a well-coordinated restart creates a short interval where live typing is not observed by the
+  engine and adds avoidable TCC/tap lifecycle risk.
+
+P8B lookup hot-path review:
+- compact lexicons preserve exact membership semantics;
+- a local optimized Swift 6.2 benchmark over the actual P8D dictionaries (15,038 mixed hit/miss
+  queries, repeated) showed compact binary lookup in the same order as Swift Set lookup on that host:
+  roughly 326-352 ns/query compact vs 332-396 ns/query Set, with identical hit counts;
+- this benchmark host is x86_64 Linux, not the target M1/macOS, so it is not treated as an M1 latency
+  measurement, but it provides no evidence that the P8B representation is intrinsically a typing
+  bottleneck.
+
+P8C allocator-pressure review:
+- on-device it recovered only about 2.8 MB after closing Settings;
+- `malloc_zone_pressure_relief(nil, 0)` is a process-wide allocator operation. Even though P8C runs
+  it once on a utility queue, it can contend with allocator zones used by other threads;
+- no user-visible stall was observed, but the stability-first release should not carry a low-level
+  process-wide trim for such a small gain.
+
+Decision:
+- production-oriented experiment should keep **P8B compact exact dictionaries + P8D lazy Pro UI**;
+- remove P8C manual malloc pressure relief;
+- keep Settings in the main process;
+- accept the AppKit high-water mark after detailed Settings is opened rather than introduce IPC,
+  process restart or allocator-pressure risk into a keyboard utility.
+
+---
+
+## P8E — stability-first memory candidate
+
+Status: IMPLEMENTED; CI intentionally triggered.
+
+Changes from P8D:
+- removed the delayed `malloc_zone_pressure_relief(nil, 0)` call and its scheduling code;
+- retained release of `SettingsWindowController` itself after close;
+- retained P8D lazy detailed Settings construction;
+- retained P8B compact exact lexicons;
+- no Engine/EventTap/LayoutDetector/TypoFix/TextReplacer/hotkey behavior changed.
+
+Expected memory trade-off:
+- cold/background memory should remain near the ~20 MB P8D level;
+- after detailed Settings has been opened, footprint may remain a few MB higher than P8C/P8D because
+  the allocator is allowed to keep free pages;
+- this is intentional: stability and typing latency take precedence over reclaiming the last few MB.
+
+Release gate:
+1. CI compile/sign/package/linkage success;
+2. fresh launch and normal typing/auto-switch test;
+3. open simple Settings and detailed Settings, close them, then continue typing immediately;
+4. verify no input pause, missed conversion or event-tap warning;
+5. if stable, prefer P8E over P8C/P8D as the base for any future optimization.
