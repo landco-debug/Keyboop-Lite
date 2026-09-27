@@ -766,3 +766,25 @@ Fix:
 Next:
 - trigger exactly one P4 Actions build;
 - if Swift compilation succeeds, inspect linkage and artifact packaging before any further cleanup.
+
+
+---
+
+## Build Probe P4 — first post-boundary build
+
+Status: TRIGGERED by this commit.
+
+Scope:
+- exactly one Actions build after S4F-fix and S4G;
+- no other source changes are bundled with the trigger;
+- ordinary pushes remain CI-gated.
+
+Success criteria:
+1. exact dictionary reconstruction passes;
+2. retained arm64 Swift source allow-list compiles;
+3. app signs and verifies;
+4. linkage contains no Whisper, FluidAudio, Sparkle or Translation framework;
+5. ZIP artifact uploads.
+
+Next:
+- inspect this exact run before any more source work.
