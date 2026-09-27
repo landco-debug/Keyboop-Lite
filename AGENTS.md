@@ -1066,3 +1066,29 @@ Fix:
 
 Next:
 - trigger one P6 build only after this correction.
+
+
+---
+
+## Build Probe P6 — runtime/UI cleanup
+
+Status: TRIGGERED by this commit.
+
+Source under test:
+- `e84ca17338f35cb27cc8834f3f824eb98b2bcaf4`.
+
+Purpose:
+- compile the P6A/P6A-1 fixes as one checkpoint;
+- verify Lite-only hotkey registry branches and simple/About UI compile;
+- verify sentinel keyCode 255 replacement for the Chromium sacrificial event;
+- confirm no removed heavy framework returns.
+
+Runtime gate after successful artifact:
+1. manual hotkey assignment must not claim removed voice/translation actions;
+2. menu Exit must quit immediately without confirmation;
+3. Basic/General/Privacy/About must contain no removed-feature UI;
+4. DoubleShift/manual correction in Chromium must not emit the user's F18 shortcut or launch CleanupBuddy;
+5. retained auto-switch, TypoFix and Autoreplace must still work.
+
+CI load rule:
+- this is the single deliberate probe for the whole P6 batch.
