@@ -742,3 +742,27 @@ Next:
 - do not spend another Actions run yet;
 - inspect the remaining P3 compiler errors for mixed PersistentResourceGuard/EventTap/settings
   boundaries, stage the smallest coherent fixes, then trigger exactly one next probe.
+
+
+---
+
+## Surgical Commit S4G — finish retained Settings boundary
+
+Status: IMPLEMENTED; CI intentionally not triggered.
+
+Compiler evidence from P3:
+- the retained switch-sound slider used `sliderDragEnded`, but that generic helper was still inside
+  the voice-only conditional;
+- the original General section still built clipboard-history and microphone rows even though those
+  subsystems are outside Lite scope.
+
+Fix:
+- `sliderDragEnded` is retained with the common sound controls;
+- Lite General keeps the original language/theme/login/icon/quick-action/sound/accessibility UI;
+- Lite General omits clipboard-history controls and all microphone controls/text;
+- non-Lite upstream General remains unchanged;
+- this is removal of irrelevant rows, not a redesigned settings surface.
+
+Next:
+- trigger exactly one P4 Actions build;
+- if Swift compilation succeeds, inspect linkage and artifact packaging before any further cleanup.

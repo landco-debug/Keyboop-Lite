@@ -2422,10 +2422,12 @@ final class DetailVC: NSViewController {
         let perm = NSButton(title: L10n.t("priv.perm"), target: self, action: #selector(openPerms))
         perm.bezelStyle = .rounded; perm.controlSize = .regular
 
+#if !KEYBOOP_LITE
         let micGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
         let mic = NSButton(title: L10n.t(micGranted ? "gen.micOk" : "gen.mic"),
                            target: self, action: #selector(requestMic))
         mic.bezelStyle = .rounded; mic.controlSize = .regular
+#endif
 
         // Оформление приложения: как в системе / светлое / тёмное. Порядок сегментов = themeKeys.
         let themeKeys = ["system", "light", "dark"]
@@ -2588,6 +2590,18 @@ final class DetailVC: NSViewController {
             // виден язык → по клику на RU/EN открывается меню; ничего не видно → перезапуск из «Программ».
             general.append(hint(L10n.t(settings.menuBarShowLanguage ? "gen.iconHiddenLang" : "gen.iconHidden")))
         }
+#if KEYBOOP_LITE
+        general.append(contentsOf: [
+            group(6),
+            card([ switchRow(L10n.t("gen.silent"), L10n.t("gen.silentSub"),
+                             !settings.silentMode, #selector(toggleSoundsEnabled), key: "gen.silent") ]),
+            group(6),
+            sectionTitle(L10n.t("gen.access")),
+            card([ buttonRow([perm]) ]),
+            group(2),
+            hint(L10n.t("gen.accessHint"))
+        ])
+#else
         general.append(contentsOf: [
             group(6),
             card([ switchRow(L10n.t("gen.silent"), L10n.t("gen.silentSub"),
@@ -2612,6 +2626,7 @@ final class DetailVC: NSViewController {
             group(2),
             hint(L10n.t("gen.micHint"))
         ])
+#endif
         return vstack(general)
     }
 
@@ -4139,6 +4154,8 @@ final class DetailVC: NSViewController {
         return seg
     }
 
+#endif
+
     /// Отпустили ли ползунок ПРЯМО СЕЙЧАС.
     ///
     /// ⚠️ `NSSlider` непрерывный, то есть действие прилетает на КАЖДЫЙ пиксель перетаскивания. Пока
@@ -4153,8 +4170,6 @@ final class DetailVC: NSViewController {
         default: return false
         }
     }
-
-#endif
 
     private func soundVolumeSlider() -> NSView {
         let s = NSSlider(value: settings.soundVolume, minValue: 0, maxValue: 1,
