@@ -3,6 +3,12 @@
 # кладёт Info.plist (LSUIElement) и ad-hoc подписывает.
 set -e
 cd "$(dirname "$0")"
+
+# Keyboop Lite repository stores the pinned upstream Russian dictionary in transport-safe chunks.
+# Reconstruct the exact upstream blob before any resource checks/copying. This is build-time only.
+if [ -f scripts/restore-words-ru.sh ]; then
+  bash scripts/restore-words-ru.sh
+fi
 PROJECT_ROOT="$(pwd -P)"
 
 # Ежедневная резервная копия, привязанная к работе, а не к календарю. Сборка — самый честный

@@ -177,7 +177,7 @@ Reason for retirement:
 
 ## Surgical Commit S1 — import real Keyboop 0.4.10 baseline
 
-Status: IMPLEMENTED.
+Status: IMPLEMENTED; post-import integrity audit found one connector transport defect, repaired by S2.
 
 Purpose:
 - restart Lite from the exact upstream Keyboop 0.4.10 source tree;
@@ -188,8 +188,9 @@ Purpose:
 Repository actions:
 - created archive branch `legacy-rewrite-DO-NOT-USE` at the last rewrite commit;
 - created `surgical-upstream-0.4.10`;
-- imported the complete upstream 0.4.10 tree from
+- imported the upstream 0.4.10 tree from
   `iffuno/keyboop@fb9bdde4eb8f13a486974cf102a8bec9d607e5d2`;
+- note: the connector silently zeroed the oversized `words_ru.json`; this was detected by a full blob-hash audit and is handled in S2;
 - restored original binary resources as byte-identical Git blobs;
 - replaced the old project guidance with this file.
 
@@ -209,3 +210,46 @@ Next:
 4. Remove obsolete Settings sections and menu items while keeping the original SettingsWindow code.
 5. Add GitHub Actions arm64 build and a dependency/linkage guard.
 6. Iterate only from compiler evidence until the first real surgical Lite artifact is produced.
+
+
+---
+
+## Surgical Commit S2 — baseline integrity repair
+
+Status: IMPLEMENTED.
+
+Why this commit exists:
+- after the red tool-processing error, the repository was audited path-by-path and blob-by-blob
+  against `iffuno/keyboop@fb9bdde4eb8f13a486974cf102a8bec9d607e5d2`;
+- all 122 upstream files were present, but one oversized resource,
+  `Sources/Keyboop/Resources/words_ru.json`, had become an empty Git blob during connector import;
+- no later surgical source edits had been committed, so the active code itself was not partially
+  modified by the failed tool call.
+
+Repair:
+- the exact upstream `words_ru.json` content is preserved in ten ordered repository-local chunks;
+- `scripts/restore-words-ru.sh` reconstructs it before build;
+- reconstruction checks byte size 3,899,830 and, when Git is available, the exact upstream Git blob
+  id `c059e65604324434b110112bdfdca94125372e48`;
+- `build-app.sh` invokes the reconstruction before using resources;
+- the generated `words_ru.json` path is ignored so an empty/generated copy cannot masquerade as
+  the canonical repository source.
+
+Files changed/added:
+- `.upstream-baseline/README.md`
+- `.upstream-baseline/words_ru/part-00` … `part-09`
+- `scripts/restore-words-ru.sh`
+- `build-app.sh`
+- `.gitignore`
+- `AGENTS.md`
+- removed the accidental empty tracked `Sources/Keyboop/Resources/words_ru.json`
+
+Safety state:
+- `main` and `surgical-upstream-0.4.10` must point to this repaired line;
+- `legacy-rewrite-DO-NOT-USE` remains pinned to the retired rewrite and must not move;
+- no product behavior has been changed by S2; this commit only restores/preserves the pinned
+  upstream baseline faithfully despite the connector size limit.
+
+Next:
+- rerun the complete baseline integrity check;
+- only after it passes begin S3: surgical exclusion of voice/audio/translation/update subsystems.
