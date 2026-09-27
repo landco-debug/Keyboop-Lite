@@ -95,17 +95,34 @@ enum KeyboardLayout {
     }
 
     private static func discover() {
-        let list = TISCreateInputSourceList(nil, false).takeRetainedValue() as NSArray
-        for object in list {
-            guard let source = object as? TISInputSource,
-                  let langsPtr = TISGetInputSourceProperty(source, kTISPropertyInputSourceLanguages)
-            else { continue }
+        let list = TISCreateInputSourceList(nil, false).takeRetainedValue()
+        let count = CFArrayGetCount(list)
 
-            let langs = Unmanaged<CFArray>.fromOpaque(langsPtr).takeUnretainedValue() as NSArray
-            let values = langs.compactMap { $0 as? String }.map { $0.lowercased() }
+        for index in 0..<count {
+            let rawSource = CFArrayGetValueAtIndex(list, index)
+            let source = unsafeBitCast(rawSource, to: TISInputSource.self)
 
-            if russian == nil, values.contains(where: { $0.hasPrefix("ru") }) { russian = source }
-            if latin == nil, values.contains(where: { $0.hasPrefix("en") }) { latin = source }
+            guard let langsPtr = TISGetInputSourceProperty(source, kTISPropertyInputSourceLanguages) else {
+                continue
+            }
+
+            let langs = unsafeBitCast(langsPtr, to: CFArray.self)
+            let langCount = CFArrayGetCount(langs)
+            var values: [String] = []
+            values.reserveCapacity(langCount)
+
+            for langIndex in 0..<langCount {
+                let rawLang = CFArrayGetValueAtIndex(langs, langIndex)
+                let cfLang = unsafeBitCast(rawLang, to: CFString.self)
+                values.append((cfLang as String).lowercased())
+            }
+
+            if russian == nil, values.contains(where: { $0.hasPrefix("ru") }) {
+                russian = source
+            }
+            if latin == nil, values.contains(where: { $0.hasPrefix("en") }) {
+                latin = source
+            }
         }
     }
 }

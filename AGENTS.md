@@ -238,3 +238,30 @@ Build/test:
 Next:
 - wait for the CI run triggered by this commit;
 - inspect the next exact compiler failure, if any, and fix only that failure.
+
+
+---
+
+## Commit 5 — fix TIS CoreFoundation iteration
+
+Status: IMPLEMENTED, CI pending.
+
+Evidence:
+- GitHub Actions run `36312474027` on commit `cac5e4ca...` reached the next compiler gate.
+- Swift rejected `object as? TISInputSource` with the hard error "conditional downcast to CoreFoundation type 'TISInputSource' will always succeed".
+
+Files changed:
+- `Sources/KeyboopLite/TextTools.swift`
+- `AGENTS.md`
+
+Fix:
+- iterate the `TISCreateInputSourceList` result as a real `CFArray` with `CFArrayGetValueAtIndex`;
+- bridge raw CF pointers to `TISInputSource`, `CFArray`, and `CFString` only at the exact property boundary;
+- avoid Swift conditional casts for CF opaque types entirely.
+
+Build/test:
+- run 3 proved all source files parse through SettingsWindow and reached `TextTools.swift`;
+- next CI run is the compile gate for the corrected TIS code.
+
+Next:
+- inspect the next CI result and continue until the arm64 artifact is produced.
