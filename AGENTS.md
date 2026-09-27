@@ -788,3 +788,47 @@ Success criteria:
 
 Next:
 - inspect this exact run before any more source work.
+
+
+---
+
+## Internal Audit A1 — post-P4 state
+
+Status: VERIFIED after user requested an audit because the build loop felt too long.
+
+What was checked:
+- current `main` HEAD;
+- recent commit chain;
+- all recent GitHub Actions runs;
+- exact P4 job steps and artifact publication;
+- `legacy-rewrite-DO-NOT-USE` preservation;
+- `surgical-upstream-0.4.10` branch position;
+- P4 linkage output and compiler warnings.
+
+Findings:
+- P4 run `36320184183` completed SUCCESSFULLY;
+- all six build steps succeeded: checkout, dictionary restore, surgical Lite build, package, upload;
+- artifact `Keyboop-Lite-macOS-Apple-Silicon` was uploaded, size 2,594,387 bytes;
+- dictionary reconstruction passed at the expected 3,899,830 bytes;
+- no Whisper, FluidAudio, Sparkle or Translation framework appeared in the linkage log;
+- remaining compiler output is warnings only (mostly original upstream Swift warnings);
+- `legacy-rewrite-DO-NOT-USE` is still pinned to `53fc576...` and was not modified.
+
+Process issue found:
+- too many compiler-probe/fix cycles were executed before reporting progress back to the user;
+- several failures were expected dependency-boundary failures from surgical removal, not GitHub runner
+  capacity failures;
+- earlier GitHub connector calls did produce real HTTP/2 transport errors, which caused retries;
+- the latest successful Actions run itself started promptly and took about five minutes, so there is
+  no evidence that the Free account was the primary bottleneck for P4.
+
+Corrected workflow rule:
+- do not launch CI for ordinary source/documentation commits;
+- `.github/workflows/build-lite.yml` already gates push builds to `.github/BUILD_LITE_TRIGGER`;
+- batch coherent source fixes first, then trigger exactly one deliberate build probe;
+- after each probe, report status before starting another series.
+
+Current hand-off:
+- `main` contains the first successfully built surgical Lite line;
+- next work should be runtime/UI verification and memory measurement before more removal;
+- do not continue trimming blindly after a successful build.
