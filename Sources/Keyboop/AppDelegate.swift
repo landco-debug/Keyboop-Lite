@@ -1383,7 +1383,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func openSettings(section: SettingsSection? = nil) {
-        if settingsWC == nil { settingsWC = SettingsWindowController() }
+        if settingsWC == nil {
+            let controller = SettingsWindowController()
+#if KEYBOOP_LITE
+            // P8A: settings are not part of the background engine. Once the user closes the window,
+            // release the whole AppKit view/controller tree instead of retaining it for the rest of
+            // the session. Reopening constructs the same upstream UI again from persisted settings.
+            controller.onClosedForRelease = { [weak self, weak controller] in
+                DispatchQueue.main.async {
+                    guard let self, let controller,
+                          controller.window?.isVisible != true,
+                          self.settingsWC === controller else { return }
+                    self.settingsWC = nil
+                    kbLog("memory: released closed Settings window")
+                }
+            }
+#endif
+            settingsWC = controller
+        }
         settingsWC?.show(section: section)
     }
 #if !KEYBOOP_LITE

@@ -119,6 +119,11 @@ enum SettingsSection: Int, CaseIterable {
 /// функция продолжает работать ровно так, как её оставили.
 
 final class SettingsWindowController: NSWindowController, NSWindowDelegate {
+#if KEYBOOP_LITE
+    /// Lite-only lifecycle hook. The background switching engine does not depend on the Settings
+    /// view tree, so AppDelegate may drop its strong reference after the window is really closed.
+    var onClosedForRelease: (() -> Void)?
+#endif
     private let split = NSSplitViewController()
     private let sidebar = SidebarVC()
     private let detail = DetailVC()
@@ -779,6 +784,14 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         // не видно, чтобы следующее открытие не перестраивало его на глазах.
         if wasGuest, showingSimple { applyMode(animate: false) }
         DockPresence.release(.settings)   // настройки закрыты → значок из Dock уходит, если его не держит история
+#if KEYBOOP_LITE
+        // Defer the release until AppKit has completed windowWillClose. This keeps the delegate
+        // alive for the callback itself, while allowing all retained NSView/constraint objects to
+        // disappear immediately afterwards. If the window was reopened in the same runloop turn,
+        // AppDelegate checks isVisible and keeps the controller.
+        let release = onClosedForRelease
+        DispatchQueue.main.async { release?() }
+#endif
     }
     /// Фокус вернулся к окну (напр. удалили файл модели в Finder и переключились обратно) — освежаем
     /// статус моделей, если открыт раздел «Голос», чтобы «Установлена/Скачать» отражали реальность на диске.

@@ -1261,3 +1261,64 @@ Runtime checkpoint:
 5. confirm Lite starts automatically after Accessibility becomes granted;
 6. then continue the P6 functional checks: DoubleShift/F18, immediate Exit, dead UI copy,
    auto-switch, TypoFix and Autoreplace.
+
+
+---
+
+## Memory Optimization Branch P8 — baseline and P8A Settings teardown
+
+Status: IMPLEMENTED on experimental branch; CI intentionally triggered by this commit.
+
+Baseline preservation:
+- exact known-good P7 baseline: `6c4f829f04b4dd4a0fd4f91dfc1b3d802c2e947e`;
+- `main` and `surgical-upstream-0.4.10` remain untouched on that P7 line;
+- `stable-p7` was created and pinned to the same P7 commit as an explicit rollback/reference branch;
+- RAM experiments are isolated on `memory-p8-experiments`.
+
+P8 rule:
+- memory work must not trade away retained functionality;
+- auto RU/EN switching, TypoFix, Autoreplace/snippets, manual switching/hotkeys, permissions,
+  retained menu behavior and the original retained Settings UI are functional gates;
+- optimize lifetime/storage first; do not simplify switching heuristics or dictionary semantics merely
+  to win RAM.
+
+P8A purpose:
+- remove a confirmed lifetime leak-by-design in Lite: after the Settings window was closed,
+  `AppDelegate.settingsWC` kept the entire SettingsWindowController/AppKit view tree alive for the
+  remainder of the process.
+
+P8A implementation:
+- `SettingsWindowController` exposes a Lite-only close lifecycle hook;
+- after AppKit finishes `windowWillClose`, AppDelegate drops its strong Settings controller reference;
+- reopening Settings constructs the same original retained UI again from persisted `AppSettings`,
+  `ExceptionStore` and `SnippetStore` state;
+- the release is deferred to the next main-runloop turn and is cancelled if the same window has
+  already become visible again;
+- non-Lite behavior is unchanged.
+
+Files changed in this implementation commit:
+- `Sources/Keyboop/AppDelegate.swift`;
+- `Sources/Keyboop/SettingsWindow.swift`;
+- `.github/workflows/build-lite.yml` (allows the isolated memory branch to run the same gated CI);
+- `.github/BUILD_LITE_TRIGGER`;
+- `AGENTS.md`.
+
+Safety / functional assessment:
+- no Engine, EventTap, LayoutDetector, LayoutData, TypoFix, TextReplacer, SnippetStore or hotkey logic changed;
+- no retained resource, dictionary, framework or setting was removed;
+- this optimization affects only memory retained after the Settings window is closed;
+- expected RAM saving depends on whether Settings has been opened during the session and must be
+  measured on-device rather than guessed from bundle size.
+
+Build Probe P8A:
+- trigger value: `probe-p8a-settings-release`;
+- source commit: <this commit>;
+- success gate: compile, strict signing, packaging, artifact upload and unchanged forbidden-linkage guard;
+- runtime gate: open/close/reopen Settings repeatedly, verify state persists and UI is identical, then
+  verify auto-switch, TypoFix, Autoreplace and manual hotkeys before proceeding to dictionary/storage work.
+
+Exact next step after P8A runtime validation:
+1. measure RAM before opening Settings, while open, and 5-10 seconds after close;
+2. if the controller teardown is proven safe, commit the result in this journal;
+3. then begin P8B dictionary representation work as a separate reversible experiment, preserving exact
+   `contains()` semantics and detection results.
