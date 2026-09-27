@@ -875,3 +875,57 @@ Process rule remains:
 - no new compiler-probe loop until the runtime checkpoint is reported;
 - ordinary documentation/source commits must not trigger Actions;
 - after every future code commit, update this hand-off journal and keep `main` plus `surgical-upstream-0.4.10` synchronized.
+
+
+---
+
+## Runtime Fix P5A — P4 permission/translocation audit
+
+Status: IMPLEMENTED; CI intentionally not triggered by this commit.
+
+Trigger:
+- first real P4 test on the target MacBook Air M1 / macOS Sequoia;
+- user launched Keyboop Lite from /Applications but still saw the original “move Keyboop to Applications”
+  warning;
+- the Lite app also insisted on Input Monitoring and could not be added to the Input Monitoring list.
+
+Root causes found:
+1. **Translocated singleton trap.** P4 acquired the cross-Keyboop singleton lock before checking App
+   Translocation. If the first launch came from Downloads/the extracted artifact, that translocated
+   process kept the lock. Launching the installed /Applications copy then became a secondary instance,
+   asked the old translocated process to open Settings, and exited. The UI therefore honestly reported
+   the old temporary path even though the user had clicked the copy in /Applications.
+2. **Wrong Lite permission gate.** The retained Lite keyboard hook is the original active
+   `.defaultTap` CGEventTap. Its own source explicitly states that this path requires Accessibility
+   and is not a listen-only/Input-Monitoring tap. P4 nevertheless inherited the full app's extra
+   `IOHIDCheckAccess(kIOHIDRequestTypeListenEvent)` gate and treated failure of that separate grant
+   as a fatal core-permission error.
+3. **CI artifact is ad-hoc signed.** That is acceptable for a test artifact but is known to make TCC
+   identity less robust than a stable Developer-ID/self-signed development identity. Therefore Lite
+   must not make a separate Input Monitoring database entry a prerequisite for core switching when
+   the retained active event tap already provides the correct live Accessibility check.
+
+Changes:
+- a translocated Lite instance now listens for a narrow `ru.keyboop.lite.stableTakeover` signal;
+- a stable Lite launch that finds the shared lock busy requests that takeover, then retries the lock;
+- original Keyboop does not listen for this Lite-only signal and is not terminated;
+- Lite menu permission state now depends on whether the retained active engine actually started;
+- on successful Lite `engine.start()`, core operation no longer requests or waits for Input Monitoring;
+- Lite permission menu points to Accessibility, not Input Monitoring;
+- optional Caps LED direct-HID behavior still keeps its separate Input Monitoring request if the user
+  explicitly enables that optional feature;
+- Lite Info.plist now includes canonical `CFBundlePackageType=APPL` and
+  `NSPrincipalClass=NSApplication`.
+
+Assessment of P4:
+- P4 compiled and linked correctly but **failed the first runtime permission/install checkpoint**;
+- P4 is not a release candidate and should not be used for further functionality/RAM conclusions;
+- no evidence was found that Whisper/FluidAudio/Sparkle/Translation dependencies returned.
+
+Next:
+- trigger exactly one P5 build;
+- install P5 only after fully quitting every P4/translocated Keyboop Lite process;
+- launch the P5 copy from /Applications;
+- grant Accessibility when requested;
+- do not manually add Lite to Input Monitoring for the core test;
+- verify real RU/EN auto-switching, TypoFix and Autoreplace before any further trimming.

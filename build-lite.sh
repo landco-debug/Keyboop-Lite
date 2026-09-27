@@ -51,6 +51,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 <dict>
   <key>CFBundleExecutable</key><string>Keyboop Lite</string>
   <key>CFBundleIdentifier</key><string>ru.keyboop.lite</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>NSPrincipalClass</key><string>NSApplication</string>
   <key>CFBundleName</key><string>Keyboop Lite</string>
   <key>CFBundleDisplayName</key><string>Keyboop Lite</string>
   <key>CFBundleShortVersionString</key><string>0.4.10-lite</string>

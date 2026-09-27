@@ -664,10 +664,16 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             // Порядок проверки не случаен: Мониторинг ввода спрашиваем ПЕРВЫМ, потому что
             // AXIsProcessTrusted() умеет залипать на false сразу после выдачи доступа (баг macOS 13+,
             // см. комментарий в AppDelegate), а IOHIDCheckAccess отвечает честно и сразу.
+#if KEYBOOP_LITE
+            let perm = NSMenuItem(title: L10n.t("menu.permAX"),
+                                  action: #selector(openPermissions),
+                                  keyEquivalent: "")
+#else
             let needIM = !Permissions.inputMonitoringGranted()
             let perm = NSMenuItem(title: L10n.t(needIM ? "menu.permInput" : "menu.permAX"),
                                   action: needIM ? #selector(openInputMonitoring) : #selector(openPermissions),
                                   keyEquivalent: "")
+#endif
             perm.target = self
             perm.image = icon("exclamationmark.triangle.fill", color: .systemOrange)
             menu.addItem(perm)

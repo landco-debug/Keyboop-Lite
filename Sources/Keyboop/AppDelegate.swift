@@ -57,6 +57,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var relaunchOffered = false   // предложили перезапуск (TCC-залипание) — один раз
     private var retryTicks = 0            // тики ретрая без успешного старта (для relaunch-эскалации)
     private var axObserver: NSObjectProtocol?   // подписка на com.apple.accessibility.api (держать ссылку)
+    private var stableTakeoverObserver: NSObjectProtocol? // translocated Lite уступает установленной копии
 
     // MARK: - Сторож живости движка (31.07.2026)
     //
@@ -101,13 +102,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Кросс-процессный сигнал «открой Настройки»: вторая копия (двойной клик по уже запущенному
     /// Keyboop, если Launch Services всё же породил процесс) шлёт его работающему экземпляру и выходит.
     static let openSettingsNotification = Notification.Name("ru.keyboop.app.openSettings")
+    static let stableTakeoverNotification = Notification.Name("ru.keyboop.lite.stableTakeover")
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // SINGLE-INSTANCE: две копии Keyboop = два CGEventTap'а = каждое нажатие чинится ДВАЖДЫ
-        // (дубли префиксов, латинские огрызки — прецедент 19.06.2026: dev `ru.keyboop.app.dev` рядом с
-        // прод `ru.keyboop.app`). Замок КРОСС-БАНДЛОВЫЙ (flock по фикс-пути), иначе разные bundle id
-        // расходятся. Если занят другим Keyboop — мы вторая копия: тихо уходим ДО установки тапа.
-        guard acquireSingleInstanceLock() else {
+        // SINGLE-INSTANCE: две копии Keyboop = два CGEventTap'а = каждое нажатие чинится ДВАЖДЫ.
+        //
+        // Lite runtime fix P5: если первая копия была запущена из Downloads/архива и попала под
+        // App Translocation, она раньше продолжала держать общий singleton.lock. После переноса
+        // Keyboop Lite в /Applications новая стабильная копия не могла стать основной: она видела
+        // занятый lock, просила СТАРУЮ translocated-копию открыть Settings и сама выходила. Поэтому
+        // пользователь честно запускал /Applications/Keyboop Lite.app, но снова видел предупреждение
+        // «перенеси в Программы». Translocated Lite теперь слушает узкий сигнал takeover и уступает
+        // lock стабильной Lite-копии. Обычный Keyboop этот сигнал не знает и не затрагивается.
+        if Permissions.isTranslocated() {
+            stableTakeoverObserver = DistributedNotificationCenter.default().addObserver(
+                forName: Self.stableTakeoverNotification, object: nil, queue: .main
+            ) { _ in
+                kbLog("single-instance: стабильная Lite-копия просит takeover — завершаю translocated GUI")
+                NSApp.terminate(nil)
+            }
+        }
+
+        var ownsSingleInstance = acquireSingleInstanceLock()
+        if !ownsSingleInstance, !Permissions.isTranslocated(), !keyboopGlobeFixRequested {
+            DistributedNotificationCenter.default().postNotificationName(
+                Self.stableTakeoverNotification, object: nil, userInfo: nil, deliverImmediately: true)
+            // Старой translocated-копии достаточно долей секунды на normal termination/cleanup.
+            Thread.sleep(forTimeInterval: 0.35)
+            ownsSingleInstance = acquireSingleInstanceLock()
+        }
+
+        guard ownsSingleInstance else {
             if ResourceGuardSingletonFailurePolicy.action(
                 explicitGlobeRepair: keyboopGlobeFixRequested
             ) == .exitRepairFailure {
@@ -192,7 +217,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // чего доступы и нужны: движок поднят И система отдаёт нам нажатия.
         menuBar.recheckPermissions = { [weak self] in
             guard let self else { return }
+#if KEYBOOP_LITE
+            // Lite's retained EventTap is an ACTIVE .defaultTap. A successful engine.start() is the
+            // live proof that Accessibility authorizes the keyboard tap. Separate Input Monitoring
+            // is only needed by optional direct-HID features such as the Caps LED indicator.
+            self.menuBar.needsPermission = !self.engineRunning
+#else
             self.menuBar.needsPermission = !(self.engineRunning && Permissions.inputMonitoringGranted())
+#endif
         }
         // Меню показывает паузу, значит обязано перерисоваться, когда она началась или кончилась.
         Pause.onChange = { [weak self] in self?.menuBar.refreshAfterPauseChange() }
@@ -899,6 +931,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             engineRunning = true
             welcomePending = false
             retryTicks = 0
+#if KEYBOOP_LITE
+            // Runtime audit P5: retained Lite input uses EventTap.options=.defaultTap, not .listenOnly.
+            // engine.start() succeeding is the permission gate for switching/TypoFix/Autoreplace.
+            // Do not block the whole app on IOHID ListenEvent; that permission is separate and is
+            // retained only for optional direct-HID features (Caps LED) if the user enables them.
+            menuBar.needsPermission = false
+            menuBar.refresh()
+            kbLog("engine STARTED ok (Lite active tap; AX=\(Permissions.isTrusted()))")
+#else
             // ⚠️ ПОДНЯВШИЙСЯ TAP НЕ ЗНАЧИТ, ЧТО МЫ ЧТО-ТО СЛЫШИМ (12.08.2026, поймано на авторе).
             //
             // `tapCreate` удаётся с одним Accessibility, и мы гасили предупреждение. Но без
@@ -928,6 +969,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             menuBar.refresh()
             kbLog("engine STARTED ok (AX=\(Permissions.isTrusted()) InputMon=\(Permissions.inputMonitoringGranted()))")
+#endif
             retryTimer?.invalidate()
             if let obs = axObserver { DistributedNotificationCenter.default().removeObserver(obs); axObserver = nil }
             return
