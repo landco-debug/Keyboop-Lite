@@ -1312,7 +1312,7 @@ Safety / functional assessment:
 
 Build Probe P8A:
 - trigger value: `probe-p8a-settings-release`;
-- source commit: <this commit>;
+- source commit: `f85793c446f38d8a55fce101f3c442f9b6dac6e2`;
 - success gate: compile, strict signing, packaging, artifact upload and unchanged forbidden-linkage guard;
 - runtime gate: open/close/reopen Settings repeatedly, verify state persists and UI is identical, then
   verify auto-switch, TypoFix, Autoreplace and manual hotkeys before proceeding to dictionary/storage work.
@@ -1322,3 +1322,41 @@ Exact next step after P8A runtime validation:
 2. if the controller teardown is proven safe, commit the result in this journal;
 3. then begin P8B dictionary representation work as a separate reversible experiment, preserving exact
    `contains()` semantics and detection results.
+
+
+---
+
+## Build Probe P8A Result — Settings lifecycle memory experiment
+
+Status: SUCCESS.
+
+Evidence:
+- workflow run `36329673381`;
+- job `108649081420`;
+- source commit `f85793c446f38d8a55fce101f3c442f9b6dac6e2`;
+- artifact ID `10935850346`, name `Keyboop-Lite-macOS-Apple-Silicon`;
+- artifact size: 2,591,780 bytes;
+- dictionary restore, 67-source arm64 compile, strict signing verification, packaging and artifact upload all succeeded.
+
+Linkage audit:
+- no Whisper;
+- no FluidAudio/Parakeet;
+- no Sparkle;
+- no Apple Translation framework;
+- direct linkage remains Apple system frameworks plus Swift runtime overlays.
+- `libswiftAVFoundation.dylib` remains only as a weak Swift overlay from retained shared source imports;
+  P8A does not change this because the current experiment is intentionally limited to object lifetime.
+
+P8A runtime checkpoint:
+1. replace P7 with this P8A artifact only for the memory experiment;
+2. record RAM after launch before opening Settings;
+3. open Settings and record RAM;
+4. close Settings, wait 5-10 seconds, and record RAM again;
+5. reopen Settings and confirm retained values/UI are intact;
+6. verify auto-switch, TypoFix, Autoreplace/snippets and manual hotkeys;
+7. do not merge this branch into `main` until these checks pass.
+
+Stable rollback remains:
+- `stable-p7` -> `6c4f829f04b4dd4a0fd4f91dfc1b3d802c2e947e`;
+- `main` remains on the P7 line;
+- all subsequent RAM work stays on `memory-p8-experiments`.
