@@ -1654,3 +1654,38 @@ Runtime gate:
 4. reopen Settings, switch to "Все", confirm sidebar/sections are visually and functionally identical;
 5. close again and record the Pro-touched high-water mark separately;
 6. verify retained input features.
+
+
+---
+
+## Build Probe P8D Result — lazy detailed Settings UI
+
+Status: SUCCESS.
+
+Evidence:
+- workflow run `36334037632`;
+- job `108661347212`;
+- source commit `e0542f8176777fdeaeb1dd59ce08b2afa667ad27`;
+- artifact ID `10936079417`, name `Keyboop-Lite-macOS-Apple-Silicon`;
+- artifact size: 3,363,803 bytes;
+- compact lexicons regenerated successfully (RU 162,760; EN 59,276);
+- all 67 retained Swift sources compiled;
+- strict signing verification, packaging and artifact upload succeeded;
+- removed heavy frameworks remain absent.
+
+What to measure on device:
+- **simple-only path:** fresh launch -> open Settings -> leave mode on "Основное" -> close -> wait 5-10 s;
+- compare against P8C post-close **33.2 MB** and fresh **18.9 MB** from the same machine;
+- then reopen, switch to "Все", verify detailed sidebar/sections, close and record the separate
+  Pro-touched high-water mark.
+
+Expected interpretation:
+- if simple-only post-close is materially below 33.2 MB, eager construction of the Pro tree was a
+  significant source of the persistent one-time AppKit footprint;
+- if it is unchanged, the remaining first-touch cost comes mostly from the shared window/root AppKit
+  path itself, and further in-process trimming has diminishing returns.
+
+Stable rollback:
+- `stable-p7` remains pinned to `6c4f829f04b4dd4a0fd4f91dfc1b3d802c2e947e`;
+- `main` remains untouched on P7;
+- all P8 memory work remains isolated on `memory-p8-experiments`.
