@@ -1131,3 +1131,53 @@ Runtime checkpoint:
 4. confirm Exit is immediate;
 5. inspect Basic, General, Privacy and About for removed-feature wording;
 6. recheck auto-switch, TypoFix and Autoreplace.
+
+
+---
+
+## Runtime Fix P7A — permission-window storm / event-tap timeout
+
+Status: IMPLEMENTED; CI intentionally not triggered by this source commit.
+
+Trigger:
+- on-device P6 test on MacBook Air M1 / macOS Sequoia;
+- while granting permissions, several permission/settings windows appeared close together;
+- the whole Mac briefly stopped responding to keyboard/mouse input;
+- Keyboop menu then showed: “Перехват снят: система его глушила, я приостановился”.
+
+This screenshot is direct evidence that EventTap's timeout-storm safety path fired:
+- `EventTap` suspends itself only after 3 `.tapDisabledByTimeout` events within 60 seconds;
+- the retained tap is an active `.defaultTap` on the main runloop, so a blocked callback can stall
+  the WindowServer input pipeline until macOS disables the tap.
+
+Root causes found:
+1. Lite inherited the full app permission choreography even after voice/onboarding removal:
+   - `tryStart()` attempted `CGEvent.tapCreate` immediately and every 0.5 s;
+   - failed start then called `AXIsProcessTrustedWithOptions(prompt=true)`;
+   - the app also opened its own NSAlert, which could then open System Settings.
+   This created overlapping native/custom permission UI and repeated TCC/tapCreate work.
+2. After a successful Lite `engine.start()`, the code immediately logged
+   `Permissions.isTrusted()`. That is synchronous TCC IPC on the SAME main runloop that just gained
+   an active `.defaultTap`. The EventTap source already documents a previous real incident where
+   this exact class of TCC IPC stalled the main runloop and froze keyboard/mouse input until macOS
+   disabled the tap.
+
+P7A fix:
+- Lite now has a separate one-window Accessibility bootstrap;
+- it issues exactly one native `requestTrust()`;
+- it does not create the active event tap until Accessibility is already reported granted;
+- fallback TCC polling runs on a utility queue at 1 Hz, never on the event-tap/main runloop;
+- no Lite custom permission NSAlert is stacked on top of the native prompt;
+- no Lite relaunch modal is stacked on the permission flow;
+- after the active Lite tap starts, the success path does not call `AXIsProcessTrusted()`;
+- Lite launch diagnostics no longer query the unrelated Input Monitoring permission.
+
+Full/non-Lite behavior is unchanged.
+
+Runtime gate for P7:
+1. fresh launch without Accessibility should show only the native macOS permission flow;
+2. opening System Settings from that native flow must not spawn additional Keyboop permission alerts;
+3. keyboard/mouse must remain responsive throughout;
+4. menu must not enter `tapSuspended`;
+5. after granting Accessibility, Lite should start automatically without app restart;
+6. retained auto-switch, TypoFix, Autoreplace and manual hotkeys must still work.

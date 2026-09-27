@@ -18,6 +18,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 #endif
     private var retryTimer: Timer?
     private var engineRunning = false
+#if KEYBOOP_LITE
+    /// Lite asks for Accessibility exactly once, then waits without creating an active event tap
+    /// until TCC reports that the grant exists. This avoids overlapping native/custom permission
+    /// windows and, more importantly, avoids stalling an already-active .defaultTap on TCC IPC.
+    private var liteAXRequestIssued = false
+    private var liteAXProbeInFlight = false
+#endif
     /// Уже написали в лог, что ждём Accessibility (иначе строка повторялась бы дважды в секунду).
     private var loggedWaitingForAX = false
     /// Системный запрос «Мониторинга ввода» показываем один раз за запуск: он всплывает поверх всего,
@@ -322,7 +329,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // (прецедент 21.07: анализировали баг по логу процесса, стартовавшего раньше пересборки).
         let stamp = Bundle.main.infoDictionary?["KeyboopBuildStamp"] as? String ?? "?"
         let isDev = (Bundle.main.bundleIdentifier ?? "").hasSuffix(".dev")
+#if KEYBOOP_LITE
+        kbLog("launched; v\(curVer)\(isDev ? "-dev" : "") [build \(stamp)] (prev \(prevVer.isEmpty ? "—" : prevVer)); AX=\(Permissions.isTrusted())")
+#else
         kbLog("launched; v\(curVer)\(isDev ? "-dev" : "") [build \(stamp)] (prev \(prevVer.isEmpty ? "—" : prevVer)); AX=\(Permissions.isTrusted()) InputMon=\(Permissions.inputMonitoringGranted())")
+#endif
         // СРАЗУ ПОСЛЕ строчки о запуске: не падали ли мы в прошлый раз (задача 135). Стоит именно
         // здесь, чтобы в логе отчёт о падении читался сразу под запуском, которому он предшествовал,
         // а не был разбросан между строками прогрева.
@@ -417,6 +428,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
 #endif
+        // Permission bootstrap.
+#if KEYBOOP_LITE
+        // Lite has no onboarding and only needs Accessibility for its retained active event tap.
+        // Do not race three UI paths (tapCreate-triggered prompt + AX prompt + our NSAlert).
+        // We issue ONE native AX request, then probe TCC off the main/event-tap runloop. Only after
+        // the grant exists do we create the active tap. This is intentionally different from the
+        // full app's older "try tap every 0.5s" path.
+        startLiteAccessibilityFlow()
+#else
         // НЕ просим доступ безусловно на каждом старте (это долбит системным диалогом).
         // Сначала тихо проверяем (AXIsProcessTrusted) — если доступ уже есть, ничего не
         // показываем. Если нет — tryStart() один раз аккуратно попросит. (см. showPermissionAlertOnce)
@@ -435,6 +455,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         RunLoop.main.add(timer, forMode: .common)
         retryTimer = timer
+#endif
         startEngineWatchdog()
         // Предохранитель снял перехват (или вернул) — строка меню должна сказать об этом сразу,
         // не дожидаясь своего тика: человек в этот момент как раз недоумевает, почему не печатается.
@@ -820,6 +841,70 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+#if KEYBOOP_LITE
+    /// One-window Accessibility flow for Lite.
+    ///
+    /// AXIsProcessTrusted* is TCC IPC. The EventTap source documents a real incident where calling
+    /// that IPC on the main runloop while an active .defaultTap existed froze keyboard + mouse long
+    /// enough for WindowServer to disable the tap. Therefore every repeating probe runs on a
+    /// utility queue and the active tap is not created until a positive result is already known.
+    private func startLiteAccessibilityFlow() {
+        if Permissions.isTranslocated() {
+            menuBar.needsPermission = true
+            menuBar.refresh()
+            showMoveToApplicationsAlertOnce()
+            return
+        }
+
+        // One initial TCC read is safe here: no event tap exists yet.
+        if Permissions.isTrusted() {
+            tryStart()
+            return
+        }
+
+        menuBar.needsPermission = true
+        menuBar.refresh()
+        if !liteAXRequestIssued {
+            liteAXRequestIssued = true
+            kbLog("Lite: запрашиваю Accessibility один раз; без собственного NSAlert и без tapCreate-цикла")
+            _ = Permissions.requestTrust()
+        }
+
+        axObserver = Permissions.observeAXChanges { [weak self] in
+            self?.probeLiteAccessibilityAsync()
+        }
+
+        let timer = Timer(timeInterval: 1.0, repeats: true) { [weak self] timer in
+            guard let self else { timer.invalidate(); return }
+            if self.engineRunning {
+                timer.invalidate()
+                return
+            }
+            self.probeLiteAccessibilityAsync()
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        retryTimer = timer
+        probeLiteAccessibilityAsync()
+    }
+
+    private func probeLiteAccessibilityAsync() {
+        guard !engineRunning, !liteAXProbeInFlight else { return }
+        liteAXProbeInFlight = true
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            let granted = Permissions.isTrusted()
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.liteAXProbeInFlight = false
+                guard !self.engineRunning else { return }
+                if granted {
+                    kbLog("Lite: Accessibility подтверждён — создаю event tap")
+                    self.tryStart()
+                }
+            }
+        }
+    }
+#endif
+
     /// Сторож живости: раз в 2 секунды сверяет «мы думаем, что работаем» с «движок реально жив».
     /// Расхождение = тап умер после успешного старта, и без этого сторожа лечилось только
     /// перезапуском приложения (см. блок комментариев у полей выше).
@@ -938,7 +1023,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // retained only for optional direct-HID features (Caps LED) if the user enables them.
             menuBar.needsPermission = false
             menuBar.refresh()
-            kbLog("engine STARTED ok (Lite active tap; AX=\(Permissions.isTrusted()))")
+            // Never call AXIsProcessTrusted() here: the active .defaultTap is already attached to
+            // this same main runloop, and blocking TCC IPC at this exact moment can make WindowServer
+            // disable the tap for timeout (and briefly stall system input).
+            kbLog("engine STARTED ok (Lite active tap)")
 #else
             // ⚠️ ПОДНЯВШИЙСЯ TAP НЕ ЗНАЧИТ, ЧТО МЫ ЧТО-ТО СЛЫШИМ (12.08.2026, поймано на авторе).
             //
@@ -978,6 +1066,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // tap не поднялся → Accessibility пока нет (или TCC ещё не пропускает живой процесс).
         menuBar.needsPermission = true
         menuBar.refresh()
+#if KEYBOOP_LITE
+        // Lite deliberately has ONE permission UI: the native Accessibility request started by
+        // startLiteAccessibilityFlow(). Do not stack our NSAlert or a relaunch offer on top of it.
+        // The background TCC probe will retry tryStart() after the grant becomes visible.
+        return
+#else
         showPermissionAlertOnce()   // один раз, НЕ блокирует ретрай (async)
 
         // Эскалация: галка Accessibility уже стоит, но tap несколько секунд всё равно не встаёт —
@@ -988,6 +1082,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             relaunchOffered = true
             offerRelaunch()
         }
+#endif
     }
 
     /// Сказать про столкновение хоткеев ОДИН раз на конфигурацию, а не при каждом запуске.
