@@ -4304,6 +4304,8 @@ final class DetailVC: NSViewController {
         if i >= 0, i < voiceLangCodes.count { settings.voiceLanguage = voiceLangCodes[i] }
     }
 
+#endif
+
     // MARK: - Карточки (нативный grouped-стиль macOS System Settings)
 
     /// Скруглённая карточка: строки, разделённые тонкими hairline (как в System Settings).
@@ -4618,8 +4620,6 @@ final class DetailVC: NSViewController {
         return l
     }
 
-#endif
-
     private func title(_ t: String) -> NSTextField {
         let l = NSTextField(labelWithString: t); l.font = .systemFont(ofSize: 20, weight: .semibold); l.textColor = .labelColor; l.alignment = .left; return l
     }
@@ -4753,7 +4753,9 @@ final class DetailVC: NSViewController {
     @objc private func openPerms() { Permissions.openAccessibilitySettings() }
     /// Ручной доступ к микрофону: не спрашивали → системный промпт; иначе — открыть
     /// панель System Settings (отозвать/выдать вручную). После промпта — обновить заголовок.
-#if !KEYBOOP_LITE
+#if KEYBOOP_LITE
+    @objc private func requestMic() {}
+#else
     @objc private func requestMic() {
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .notDetermined:
@@ -5064,7 +5066,8 @@ final class DetailVC: NSViewController {
         }
         if m.engine == "whisper" { ModelDownloader.shared.delete(m.id, completion: finish) }
         else { ParakeetEngine.shared.deleteModel(completion: finish) }
-    }#endif
+    }
+#endif
 
 }
 

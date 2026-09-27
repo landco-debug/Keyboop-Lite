@@ -715,3 +715,30 @@ Expected checks:
 Next:
 - inspect this exact workflow run;
 - fix only the next concrete compiler/linkage boundary it reports.
+
+
+---
+
+## Surgical Commit S4F-fix — restore common Settings helpers and pasteboard marker
+
+Status: IMPLEMENTED; CI intentionally not triggered.
+
+Compiler evidence from Build Probe P3:
+- the S4F conditional around voice controls accidentally also covered the original common grouped
+  Settings helpers (`card`, `switchRow`, `controlRow`, `vstack`, section headings, etc.);
+- retained PlainPaste/SelectionText/SecureInputProbe also lost the tiny `NSPasteboard.kbNoteOurs()`
+  extension because upstream colocates it with the removed ClipboardWatcher.
+
+Fix:
+- the voice-only guard now ends before the original grouped-settings helper block, so retained
+  Switching/Exceptions/Autoreplace/General/Privacy/About continue using the exact upstream UI;
+- Lite keeps a no-op `requestMic` selector only because the retained upstream Privacy builder
+  references it; no microphone permission request is performed;
+- added `PasteboardOwnershipBridge.swift`, containing only the upstream one-line pasteboard marker
+  extension backed by retained `PasteboardOwnership`;
+- ClipboardWatcher itself remains physically excluded, so no clipboard history watcher is restored.
+
+Next:
+- do not spend another Actions run yet;
+- inspect the remaining P3 compiler errors for mixed PersistentResourceGuard/EventTap/settings
+  boundaries, stage the smallest coherent fixes, then trigger exactly one next probe.

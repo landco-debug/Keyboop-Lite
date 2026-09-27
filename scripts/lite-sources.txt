@@ -39,6 +39,7 @@ Sources/Keyboop/LayoutManager.swift
 Sources/Keyboop/Logger.swift
 Sources/Keyboop/MenuBarController.swift
 Sources/Keyboop/NumericTypoRule.swift
+Sources/Keyboop/PasteboardOwnershipBridge.swift
 Sources/Keyboop/Pause.swift
 Sources/Keyboop/Permissions.swift
 Sources/Keyboop/PersistentResourceGuard.swift
