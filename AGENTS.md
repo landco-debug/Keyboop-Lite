@@ -957,3 +957,42 @@ Success gate:
 4. linkage still has no Whisper, FluidAudio, Sparkle or Translation framework;
 5. artifact uploads;
 6. only then hand the P5 artifact to the user for a fresh /Applications runtime test.
+
+
+---
+
+## Build Probe P5 Result — permission/install repair artifact
+
+Status: SUCCESS.
+
+Evidence:
+- workflow run `36325191382`;
+- job `108636503083`;
+- all build/package/upload steps completed successfully;
+- exact `words_ru.json` restore: 3,899,830 bytes;
+- artifact ID `10933504382`, name `Keyboop-Lite-macOS-Apple-Silicon`;
+- outer artifact size: 2,593,963 bytes;
+- inner packaged `Keyboop-Lite.zip`: 2,599,512 bytes;
+- unpacked app remains about 8.6 MB; executable remains about 2.7 MB;
+- resulting Info.plist contains `CFBundlePackageType=APPL`,
+  `NSPrincipalClass=NSApplication`, bundle id `ru.keyboop.lite`, minimum macOS 15.0.
+
+Linkage check:
+- no Whisper;
+- no FluidAudio/Parakeet;
+- no Sparkle;
+- no Apple Translation framework;
+- retained linkage is Apple system frameworks plus Swift runtime overlays.
+
+Runtime checkpoint:
+- P5 replaces P4 for testing;
+- fully quit P4 before installation so no old translocated process or singleton lock survives;
+- replace only `Keyboop Lite.app` in /Applications; keep original `Keyboop.app` separate;
+- core test requires Accessibility; do not manually add Lite to Input Monitoring;
+- Input Monitoring remains relevant only to optional direct-HID Caps LED functionality if explicitly enabled.
+
+Next:
+- verify that the P5 process started from /Applications no longer reports translocation;
+- grant Accessibility and verify real keyboard operation;
+- then test auto-switch, TypoFix and Autoreplace;
+- only after runtime success measure RAM and continue trimming.
