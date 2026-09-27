@@ -1810,3 +1810,45 @@ Release gate:
 3. open simple Settings and detailed Settings, close them, then continue typing immediately;
 4. verify no input pause, missed conversion or event-tap warning;
 5. if stable, prefer P8E over P8C/P8D as the base for any future optimization.
+
+
+---
+
+## Build Probe P8E Result — stability-first candidate
+
+Status: SUCCESS.
+
+Evidence:
+- workflow run `36335477226`;
+- job `108665380694`;
+- source commit `3f41eb855fab0fd88dfea51e5739199057dba4a6`;
+- artifact ID `10936909428`, name `Keyboop-Lite-macOS-Apple-Silicon`;
+- artifact size: 3,362,399 bytes;
+- compact lexicons regenerated successfully:
+  - RU 162,760 words;
+  - EN 59,276 words;
+- all 67 retained Swift sources compiled;
+- signing verification, packaging and artifact upload succeeded.
+
+Linkage audit:
+- no Whisper;
+- no FluidAudio/Parakeet;
+- no Sparkle;
+- no Apple Translation framework;
+- only Apple system frameworks plus existing weak Swift overlays remain.
+
+P8E release intent:
+- keep P8B compact exact lexicons;
+- keep P8D lazy Pro Settings construction;
+- keep closed Settings controller release;
+- remove P8C manual `malloc_zone_pressure_relief`;
+- no separate Settings process;
+- no engine restart after Settings close;
+- no changes to Engine/EventTap/LayoutDetector/TypoFix/TextReplacer/hotkeys.
+
+On-device gate before considering merge:
+1. fresh launch and normal typing;
+2. verify auto RU/EN switching and TypoFix under fast typing;
+3. open/close "Основное", immediately keep typing;
+4. open "Все", change one harmless setting, close, immediately keep typing;
+5. confirm no pause, lost keystrokes, missed conversion, hotkey failure or event-tap warning.
