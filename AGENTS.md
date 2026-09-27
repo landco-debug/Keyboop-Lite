@@ -442,3 +442,35 @@ Next:
 - inspect exactly one CI run;
 - make one narrow S3B commit addressing only the first dependency boundary reported by CI;
 - repeat until the first surgical Lite binary builds.
+
+
+---
+
+## Surgical Commit S4D1 — isolate Engine voice/translation/history branches
+
+Status: IMPLEMENTED; CI not triggered by this commit.
+
+Purpose:
+- keep the original switching/autoreplace Engine intact while compiling out unrelated Engine entry
+  points for dictation, Apple Translation and “paste last dictation”.
+
+Changes:
+- `Engine.swift` retains all layout switching, live correction, typo correction, snippet expansion,
+  manual conversion, case-change and selection infrastructure;
+- Lite excludes only:
+  - menu/keyboard dictation entry points;
+  - Apple Translation selection path;
+  - last-dictation insertion/history path.
+
+Method:
+- original upstream implementations remain in-place behind `#if !KEYBOOP_LITE`;
+- no simplified replacement Engine was introduced.
+
+Build/test:
+- no Actions run spent on this micro-step;
+- `Warm.swift`, already added in S4B, remains the original language-data + TypoFix warmup used by
+  retained switching.
+
+Next:
+- S4D2: make EventTap's protocol and event-state machine omit dictation/translation/history hotkeys
+  in Lite while leaving switching, autoreplace, case change, plain paste and snippet picking intact.

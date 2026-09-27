@@ -9,8 +9,10 @@ final class Engine: EventTapHandler {
     private let buffer = KeystrokeBuffer()
     private let eventTap = EventTap()
 
+#if !KEYBOOP_LITE
     /// Переключить диктовку не с клавиатуры (быстрое действие в строке меню, задача 21).
     func toggleVoiceFromMenu() { eventTap.toggleVoiceExternally() }
+#endif
 
     /// Вставка выбранного сниппета. Идём тем же путём, что и голосовой ввод: печать Unicode
     /// без буфера обмена (принцип №1) и без бэкспейсов, потому что стирать нечего.
@@ -500,9 +502,11 @@ final class Engine: EventTapHandler {
         }
     }
 
+#if !KEYBOOP_LITE
     // Голосовой ввод (hold-to-talk) — делегируем оркестратору.
     func handleVoiceBegin() { VoiceController.shared.begin() }
     func handleVoiceEnd() { VoiceController.shared.end() }
+#endif
 
     /// Возвращает true, если клавишу надо ПРОГЛОТИТЬ (граница слова раскрыла сниппет — см. expandSnippet).
     ///
@@ -1294,6 +1298,7 @@ final class Engine: EventTapHandler {
         }
     }
 
+#if !KEYBOOP_LITE
     func handleTranslateHotkey() {
         kbLog("translate: хоткей нажат")
         DispatchQueue.main.async { [weak self] in self?.translateSelection() }
@@ -1353,6 +1358,7 @@ final class Engine: EventTapHandler {
         #endif
     }
 
+#endif
     // MARK: - Смена регистра выделенного
 
     func handleCaseHotkey() {
@@ -1360,6 +1366,7 @@ final class Engine: EventTapHandler {
         DispatchQueue.main.async { [weak self] in self?.changeSelectionCase() }
     }
 
+#if !KEYBOOP_LITE
     /// ВСТАВИТЬ ПОСЛЕДНЮЮ ДИКТОВКУ (задача 242, отзыв #245 от 05.09.2026).
     ///
     /// Жалоба дословно: «надиктовал, нажал „Завершить диктовку“, текст вставился, но курсор по
@@ -1453,6 +1460,7 @@ final class Engine: EventTapHandler {
         kbLog("последняя диктовка: вставляю \(text.count) симв.")   // только длина, принцип №2
     }
 
+#endif
     /// СМЕНА РЕГИСТРА ВЫДЕЛЕННОГО ТЕКСТА (задача 122).
     ///
     /// Просьба пользователя дословно: «телефон → ТЕЛЕФОН» по сочетанию. автор уточнил объём: именно
