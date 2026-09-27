@@ -615,3 +615,24 @@ Next:
 - S4E: remove voice-history coupling from SnippetPicker;
 - S4F: isolate voice/translation/update-only SettingsWindow helpers;
 - trigger one CI probe only after those staged commits.
+
+
+---
+
+## Surgical Commit S4E — make SnippetPicker snippets-only in Lite
+
+Status: IMPLEMENTED; CI intentionally not triggered.
+
+Compiler evidence:
+- Lite still referenced `VoiceHistory`, `HistoryGate` and `VoiceIndicator` from the original
+  SnippetPicker's optional “last dictation” row.
+
+Fix:
+- Lite's original SnippetPicker still shows and inserts the retained text snippets;
+- the dictation-only zero row always resolves to nil in Lite;
+- the voice HUD toast for an empty picker is omitted in Lite;
+- the non-Lite upstream behavior remains unchanged behind conditional compilation.
+
+Next:
+- isolate voice/history/translation/update-only SettingsWindow helpers;
+- then remove HistoryGate from the Lite allow-list if no retained references remain.

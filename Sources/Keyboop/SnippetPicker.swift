@@ -40,6 +40,10 @@ final class SnippetPicker {
     var onPickLastDictation: (() -> Void)?
 
     /// Текст последней диктовки, если её прямо сейчас можно вставить, иначе nil.
+#if KEYBOOP_LITE
+    static func lastDictationText() -> String? { nil }
+
+#else
     static func lastDictationText() -> String? {
         // DEV-ХУК ДЛЯ СНИМКА (`KEYBOOP_SNIPPICK_DEMO=1`, зовёт `Tools/snipshot.sh`). Без него
         // нулевую строку нельзя увидеть в пикселях: она показывается только когда в истории есть
@@ -55,6 +59,8 @@ final class SnippetPicker {
         guard let t = VoiceHistory.shared.lastVisible()?.text, !t.isEmpty else { return nil }
         return t
     }
+
+#endif
 
     var isOpen: Bool { panel != nil }
 
@@ -76,7 +82,9 @@ final class SnippetPicker {
         let dictation = Self.lastDictationText()
         // Пусто, только если нечего вставить ВООБЩЕ: ни сниппетов, ни свежей диктовки.
         guard !pairs.isEmpty || dictation != nil else {
+#if !KEYBOOP_LITE
             VoiceIndicator.shared.showToast(L10n.t("snip.pickEmpty"))
+#endif
             return false
         }
         // ⚠️ ПОРЯДОК ВАЖЕН, здесь была ошибка (найдена автором 06.08). Сначала стояло `shown = pairs`,
