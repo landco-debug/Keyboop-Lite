@@ -330,3 +330,45 @@ Action:
 Next probe:
 - trigger `probe-p2`;
 - stop again at the next compiler-reported dependency rather than batching speculative removals.
+
+
+---
+
+## Surgical Commit S4B — cut heavy startup/runtime references
+
+Status: IMPLEMENTED; CI not triggered by this commit.
+
+Purpose:
+- make the original shared `AppDelegate` compile as a Lite build without importing/starting
+  voice, audio, history, updater, feedback, onboarding or slap runtime;
+- preserve upstream code behind `#if !KEYBOOP_LITE` instead of rewriting retained switching logic.
+
+Changes:
+- `build-lite.sh`: defines `KEYBOOP_LITE` for the Lite compiler invocation;
+- `AppDelegate.swift`: Lite excludes AVFoundation, voice dictionary setup, voice/history/menu
+  callbacks, call recording, Sparkle startup, microphone request, onboarding, voice/history/feedback
+  developer hooks, update/model/welcome helpers, history/slap helpers and heavy termination cleanup;
+- repeat-open behavior in Lite always reopens the retained Settings window;
+- `scripts/lite-sources.txt`: adds `Warm.swift` because it warms LayoutData + TypoFix for switching,
+  and adds `ClipboardHistoryCore.swift` only because retained plain-paste/selection code uses its
+  pure `PasteboardOwnership` helper. `ClipboardWatcher.swift` remains excluded, so no clipboard
+  history watcher is started.
+
+Important architectural point:
+- this is conditional exclusion inside the original upstream shared file, not a replacement
+  AppDelegate;
+- the original switching engine, layout detector, TypoFix and autoreplace code are untouched;
+- no Actions run is spent here. The next compiler probe is deferred until MenuBar/Engine/EventTap
+  and Settings shared references are cut in similarly small commits.
+
+Known remaining compiler blockers from P2:
+- MenuBarController voice/history/update/feedback paths;
+- Engine voice/translation/history paths;
+- EventTap VoiceGate/voice hotkeys;
+- SettingsWindow voice/translation/update helpers;
+- SnippetPicker last-dictation row;
+- PersistentResourceGuard slap-SPU coupling.
+
+Next:
+- S4C: surgically remove Lite-only MenuBar voice/history/update/feedback paths while retaining
+  original Auto, Pause, permissions/status, Settings and Quit UI.

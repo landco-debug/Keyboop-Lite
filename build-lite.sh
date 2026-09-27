@@ -28,6 +28,7 @@ xcrun swiftc -O -whole-module-optimization \
   "${SOURCES[@]}" \
   -o "$BIN" \
   -swift-version 5 \
+  -D KEYBOOP_LITE \
   -target arm64-apple-macos15.0 \
   -framework AppKit \
   -framework Carbon \

@@ -11,6 +11,7 @@ Sources/Keyboop/CapsLED.swift
 Sources/Keyboop/CapsRemap.swift
 Sources/Keyboop/CaretLocator.swift
 Sources/Keyboop/Changelog.swift
+Sources/Keyboop/ClipboardHistoryCore.swift
 Sources/Keyboop/CrashNote.swift
 Sources/Keyboop/CueSynth.swift
 Sources/Keyboop/DockPresence.swift
@@ -62,4 +63,5 @@ Sources/Keyboop/TextSnippetStore.swift
 Sources/Keyboop/TypoFix.swift
 Sources/Keyboop/UIControls.swift
 Sources/Keyboop/UndoLearner.swift
+Sources/Keyboop/Warm.swift
 Sources/Keyboop/main.swift

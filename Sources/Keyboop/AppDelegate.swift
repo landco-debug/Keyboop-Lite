@@ -1,17 +1,21 @@
 import AppKit
+#if !KEYBOOP_LITE
 import AVFoundation
+#endif
 import Carbon   // AppleEvent-константы (kAEOpenApplication / keyAELaunchedAsLogInItem) для детекта ручного запуска
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var engine: Engine!
     private var menuBar: MenuBarController!
     private var settingsWC: SettingsWindowController?
+#if !KEYBOOP_LITE
     private var historyWC: VoiceHistoryWindowController?
     private var welcomeWC: WelcomeWindowController?
     /// Физический жест по корпусу (задача 35). Сам объект ничего не открывает до opt-in настройки;
     /// держим его здесь, потому что только AppDelegate уже знает все пять адресатов действия.
     private var slapDetector: SlapDetector?
     private var slapSettingsObserver: NSObjectProtocol?
+#endif
     private var retryTimer: Timer?
     private var engineRunning = false
     /// Уже написали в лог, что ждём Accessibility (иначе строка повторялась бы дважды в секунду).
@@ -37,7 +41,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 timer.invalidate(); self.imWatchTimer = nil
                 self.menuBar.needsPermission = false
                 self.menuBar.refresh()
+#if !KEYBOOP_LITE
                 if ReleaseFeatures.slap { self.restartSlapGestureIfNeeded() }
+#endif
                 kbLog("доступ «Мониторинг ввода» выдан — предупреждение снято, ввод виден")
             } else if left <= 0 {
                 timer.invalidate(); self.imWatchTimer = nil
@@ -159,6 +165,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         CapsLED.reconcile()     // лампочка Caps Lock как индикатор языка (если включена в настройках).
                                 // Не зависит от Accessibility: работает и до старта движка.
         installTerminationSignalHandlers()   // SIGTERM/SIGINT: вернуть системе 🌐 и Caps (см. ниже)
+#if !KEYBOOP_LITE
         // ⚠️ ПРЕДОХРАНИТЕЛЬ НЕЧЁТКОГО СОВПАДЕНИЯ В СЛОВАРЕ ДИКТОВКИ (задача 192). Проверяем не
         // только `contains`: при отказе words_ru/words_en в Set всё ещё остаются ExtraWords, и без
         // отдельного ready-бита почти весь язык выглядел бы «неизвестным». Любой неполный комплект
@@ -171,12 +178,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         VoiceDictionary.configureFuzzyLanguageGuard(isReady: fuzzyWordsReady) { w in
             languageData.wordsRu.contains(w) || languageData.wordsEn.contains(w)
         }
+#endif
         engine = Engine()
         menuBar = MenuBarController(layout: engine.layout)
         menuBar.onOpenSettings = { [weak self] in self?.openSettings() }
         menuBar.onOpenPrivacy = { [weak self] in self?.openSettings(section: .privacy) }
+#if !KEYBOOP_LITE
         menuBar.onShowVoiceHistory = { [weak self] in self?.openVoiceHistory() }
         menuBar.onQuickDictate = { [weak self] in self?.engine.toggleVoiceFromMenu() }
+#endif
         // Правду о доступах меню берёт в момент открытия, а не помнит с запуска (см.
         // MenuBarController.recheckPermissions). «Всё в порядке» здесь значит буквально то, ради
         // чего доступы и нужны: движок поднят И система отдаёт нам нажатия.
@@ -188,10 +198,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Pause.onChange = { [weak self] in self?.menuBar.refreshAfterPauseChange() }
         // Реализация жеста остаётся в дереве, но в 0.4.6 не создаём detector вообще: это закрывает
         // и обычный opt-in, и KEYBOOP_SLAP_DIAG, и сохранённый defaults из прежней Dev-сборки.
+#if !KEYBOOP_LITE
         if ReleaseFeatures.slap { configureSlapGesture() }
+#endif
+#if !KEYBOOP_LITE
         menuBar.onCheckUpdates = { UpdaterController.shared.checkNow() }
+#endif
         menuBar.onQuit = { NSApp.terminate(nil) }
+#if !KEYBOOP_LITE
         menuBar.onToggleCallRecording = { CallRecorder.shared.toggle() }   // скрытая запись звонка (230)
+#endif
         menuBar.openMenuForShot()   // KEYBOOP_MENUSHOT=1: сам открывает меню под снимок, иначе молчит
         menuBar.onToggleAuto = { _ in }
         // Через main: колбэк зовётся СИНХРОННО из обработчика события (Enter-pre конверсия), а
@@ -235,6 +251,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         UndoLearner.shared.onSuggestLearn = { [weak self] word in
             DispatchQueue.main.async { self?.suggestLearnBanner(word) }
         }
+#if !KEYBOOP_LITE
         VoiceController.shared.onStateChange = { [weak self] s in
             DispatchQueue.main.async { self?.menuBar.setVoiceState(s) }
         }
@@ -251,6 +268,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ClipboardWatcher.shared.apply()    // история буфера (задача 228): живёт только при явном тумблере
         CallRecorder.recoverUnfinishedSessions()   // запись звонка, оборванная крэшем или выключением (230)
 
+#endif
         // Dev-помощник: запуск с --settings[=snippets] сразу открывает Настройки (на нужном разделе).
         if let arg = CommandLine.arguments.first(where: { $0.hasPrefix("--settings") }) {
             let sec: SettingsSection? = arg.contains("snippets") ? .snippets
@@ -322,6 +340,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             kbLog("миграция: мгновенное переключение было на Shift (keyCode \(kc)) — выключено, оно ложно срабатывало после заглавных букв")
         }
 
+#if !KEYBOOP_LITE
         // Первый запуск: окно-приветствие (онбординг) — один раз.
         if !AppSettings.shared.didShowWelcome
             && ProcessInfo.processInfo.environment["KEYBOOP_DUMP"] != "1"
@@ -332,6 +351,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in self?.showWelcome() }
         }
 
+#endif
         // ХОЛОДНЫЙ СТАРТ НИКОГДА НЕ ОТКРЫВАЕТ ОКНО (правило автора 11.08.2026, оно же починка
         // отзыва #118 «после каждого входа в macOS само открывается главное окно»).
         //
@@ -350,6 +370,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         //     РАБОТАЮЩАЯ копия (см. single-instance выше: вторая копия шлёт сигнал и выходит).
         // Второй пункт и есть выход для тех, кто спрятал значок: двойной клик по программе всегда
         // открывает настройки, потому что программа к этому моменту уже работает.
+#if !KEYBOOP_LITE
         // Новый пользователь: заранее (один раз) просим доступ к микрофону, чтобы диктовка
         // сразу работала, а не «молчала». Раньше доступ спрашивался лениво — только при
         // первом нажатии хоткея И при установленной модели, поэтому промпт часто не появлялся.
@@ -363,6 +384,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
+#endif
         // НЕ просим доступ безусловно на каждом старте (это долбит системным диалогом).
         // Сначала тихо проверяем (AXIsProcessTrusted) — если доступ уже есть, ничего не
         // показываем. Если нет — tryStart() один раз аккуратно попросит. (см. showPermissionAlertOnce)
@@ -388,6 +410,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             DispatchQueue.main.async { self?.menuBar.refresh() }
         }
 
+#if !KEYBOOP_LITE
         // Автообновления (Sparkle): по умолчанию спрашиваем НАШИМ баннером (две кнопки, AppBanner —
         // без системных уведомлений), тихо — только если юзер выбрал «авто». Под dev-рендер-хуками
         // не стартуем (без сетевых проверок).
@@ -408,6 +431,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             UpdaterController.shared.start()
         }
 
+#endif
         // Конфликт с Punto Switcher — проверяем чуть позже старта (и не во время онбординга).
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in self?.checkPuntoConflictOnce() }
 
@@ -497,6 +521,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.openSettings(section: .privacy)
             }
         }
+#if !KEYBOOP_LITE
         // Dev-хук: показать тост (KEYBOOP_TOAST=1). Тост живёт две секунды и появляется по
         // действию, которое руками к моменту снимка уже не повторить, поэтому без хука его
         // внешний вид проверялся «на память». автор 06.08 нашёл там чужой зелёный цвет.
@@ -516,6 +541,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         }
+#endif
+#if !KEYBOOP_LITE
         // Dev-хук: плашка диктовки (KEYBOOP_HUDSHOT=1). Записи без микрофона не бывает, значит и
         // посмотреть на плашку иначе как продиктовав что-нибудь нельзя — а смотреть на неё придётся
         // каждый раз, когда трогаем её вид (задача 125). Хук показывает оба живых состояния и
@@ -544,11 +571,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         }
+#endif
         // ОДНА КЛАВИША НА ДВА ДЕЙСТВИЯ: проверяем при КАЖДОМ запуске, а не только при назначении
         // (отзыв #134). Человек видит не «конфликт», а «переключение тормозит», и сам никогда не
         // свяжет одно с другим: каждое нажатие ждёт, удержание это или нажатие.
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in self?.warnHotkeyClashOnce() }
 
+#if !KEYBOOP_LITE
         // Dev-хук: ЖИВОЙ ТЕКСТ на плашке (KEYBOOP_LIVESHOT=1 у курсора, =2 в вырезе).
         //
         // Появился 13.08.2026 вместе с возвратом потокового набора. Смотреть на живой текст иначе
@@ -586,6 +615,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 RunLoop.main.add(feed, forMode: .common)
             }
         }
+#endif
         // Dev-хук: показать список выбора сниппета (KEYBOOP_SNIPPICK=1). Плашка не крадёт фокус и
         // управляется цифрами через перехватчик, поэтому руками её на снимок не поймать: любой клик
         // мимо ничего не закроет, а нажатие цифры вставит текст в чужое окно. Хук показывает её и
@@ -617,6 +647,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     ])
             }
         }
+#if !KEYBOOP_LITE
         // Dev-хук: снять блок ввода формы отзыва и выйти (диагностика «не видно текст», см.
         // FeedbackWindowController.dumpFieldForDev).
         if ProcessInfo.processInfo.environment["KEYBOOP_FBDUMP"] == "1" {
@@ -629,6 +660,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         }
+#endif
         // Dev-хук: отрендерить все разделы настроек в PNG и выйти.
         if ProcessInfo.processInfo.environment["KEYBOOP_DUMP"] == "1" {
             kbLog("DUMP: hook armed")
@@ -690,6 +722,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         }
+#if !KEYBOOP_LITE
         // Dev-хук: открыть окно истории с демо-записями и ЖИТЬ, чтобы его можно было снять снаружи
         // через `screencapture -l <windowID>`. Нужен потому, что `KEYBOOP_HISTDUMP` рисует только
         // contentView, а кнопки в ЗАГОЛОВКЕ окна (скорость, прозрачность, «поверх всех») живут в
@@ -734,6 +767,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 12.0) { NSApp.terminate(nil) }
             }
         }
+#endif
         // Dev-хук: off-screen рендер образца баннера на ОБОИХ языках и выход (визуальная проверка).
         if ProcessInfo.processInfo.environment["KEYBOOP_BANNERSHOT"] == "1" {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
@@ -1051,6 +1085,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// крутится в фоне как агент) — macOS не плодит второй экземпляр, а зовёт это.
     /// Открываем настройки, чтобы клик не «проваливался в пустоту».
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+#if KEYBOOP_LITE
+        openSettings()
+#else
         // Значок в Dock появляется и ради окна истории (задача 229): клик по нему должен вернуть
         // именно его, а не открыть настройки поверх.
         if let history = VoiceHistoryWindowController.frontmost {
@@ -1058,6 +1095,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             openSettings()
         }
+#endif
         NSApp.activate(ignoringOtherApps: true)
         return true
     }
@@ -1098,6 +1136,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Готов апдейт → НАШ баннер вверху справа с двумя кнопками (без системных уведомлений и их
     /// запроса разрешений — по просьбе автора). Ждёт решения; «Обновить» ставит, «Авто» включает тихий
     /// режим. Закрыл/проигнорировал — переспросит на следующей проверке (или поставится при выходе).
+#if !KEYBOOP_LITE
     private func notifyUpdateReady(_ version: String) {
         AppBanner.shared.show(
             title: String(format: L10n.t("upd.notifyTitle"), version),
@@ -1139,6 +1178,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         welcomeWC?.show()
     }
 
+#endif
     /// Минимальное главное меню. У LSUIElement-агента его нет по умолчанию, из-за чего стандартные
     /// сочетания (Cmd+V/C/X/A/Z) НЕ доходят до текстовых полей — без пункта Paste в меню key-equivalent
     /// не срабатывает. App-меню даёт Cmd+Q / Cmd+W; Edit-меню — нативный буфер обмена в наших полях.
@@ -1207,6 +1247,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if settingsWC == nil { settingsWC = SettingsWindowController() }
         settingsWC?.show(section: section)
     }
+#if !KEYBOOP_LITE
     private func openVoiceHistory() {
         if historyWC == nil {
             historyWC = VoiceHistoryWindowController()
@@ -1308,6 +1349,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+#endif
     /// Перед exit() освобождаем модель Whisper (whisper_free): Swift не зовёт deinit при выходе
     /// процесса, Metal-буферы «утекали» за exit, и статический деструктор ggml бил ассерт → SIGABRT
     /// при квите (краш-репорт 20.07, llama.cpp #19137 «not a bug — free your context before exit»).
@@ -1333,7 +1375,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let src = DispatchSource.makeSignalSource(signal: sig, queue: .main)
             src.setEventHandler {
                 kbLog("получен сигнал \(sig) — сторож останавливает SPU и возвращает 🌐, выхожу")
+#if !KEYBOOP_LITE
                 self.slapDetector?.shutdown()
+#endif
                 CapsRemap.removeIfOurs()
                 CapsLED.shutdown(atExit: true)   // иначе лампочка останется гореть после нас
                 // One authenticated transaction preserves the global order: local HID close →
@@ -1352,6 +1396,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var isSecondaryInstance = false
 
     func applicationWillTerminate(_ notification: Notification) {
+#if !KEYBOOP_LITE
         CallRecorder.shared.stopForTermination()   // сегмент закрывается, расшифровку доберёт следующий запуск
         VoiceController.shared.unloadForTermination()
         slapDetector?.shutdown()
@@ -1359,6 +1404,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NotificationCenter.default.removeObserver(observer)
             slapSettingsObserver = nil
         }
+#endif
         // ⚠️ ВТОРАЯ КОПИЯ НИЧЕГО НЕ ОТКАТЫВАЕТ (ревью 17.08). Флаг `capsRemapApplied` лежит в общих
         // defaults и выставлен РАБОТАЮЩЕЙ копией, поэтому guard внутри removeIfOurs проходил и у
         // второй: запуск из DMG обновления при живом старом снимал hidutil-ремап у него под ногами —
