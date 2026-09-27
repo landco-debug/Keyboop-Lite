@@ -1092,3 +1092,42 @@ Runtime gate after successful artifact:
 
 CI load rule:
 - this is the single deliberate probe for the whole P6 batch.
+
+
+---
+
+## Build Probe P6 Result — four runtime/UI fixes packaged
+
+Status: SUCCESS.
+
+Evidence:
+- workflow run `36327626012`;
+- job `108643325784`;
+- artifact ID `10934169148`, name `Keyboop-Lite-macOS-Apple-Silicon`;
+- outer artifact size: 2,591,874 bytes;
+- dictionary restore, Swift compile, signing, package and upload all succeeded;
+- linkage remains Apple system frameworks + Swift runtime overlays only;
+- no Whisper, FluidAudio/Parakeet, Sparkle or Translation framework was restored.
+
+P6 user-facing changes under test:
+- removed functions no longer reserve hotkeys in Lite;
+- Lite Exit no longer asks for confirmation;
+- Basic/General/Privacy/About were cut to retained Lite functions and Lite-only copy;
+- right-click actions are only Pause and Settings in Lite, with old removed values normalized;
+- Chromium/Electron sacrificial event is keyCode 255 instead of F18, so it cannot trigger the user's
+  F18-bound CleanupBuddy shortcut.
+
+Binary audit note:
+- the shared upstream `L10n.swift` still physically contains dead full-build strings, and some
+  full-build-only control types are still present as unreachable compiled text/symbols.
+- P6 removes their user-visible routes but does NOT yet claim physical dead-string elimination.
+- do not expand this into another blind cleanup before the four P6 runtime checks pass; after that,
+  a separate size/RAM cleanup can split Lite localization/control code safely.
+
+Runtime checkpoint:
+1. replace P5 with P6 in /Applications;
+2. select DoubleShift and confirm no CleanupBuddy/F18 action fires;
+3. confirm no phantom “voice typing” conflict;
+4. confirm Exit is immediate;
+5. inspect Basic, General, Privacy and About for removed-feature wording;
+6. recheck auto-switch, TypoFix and Autoreplace.
