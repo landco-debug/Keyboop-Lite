@@ -1585,3 +1585,72 @@ Stable rollback remains unchanged:
 - `stable-p7` -> `6c4f829f04b4dd4a0fd4f91dfc1b3d802c2e947e`;
 - `main` remains on P7;
 - RAM experiments remain isolated on `memory-p8-experiments`.
+
+
+---
+
+## P8C runtime result — allocator relief helps, but first-touch Settings caches remain
+
+Status: ON-DEVICE TESTED.
+
+Measured on MacBook Air M1 / macOS Sequoia:
+- fresh P8C main process before opening Settings: **18.9 MB**;
+- helper process: **2.7 MB**;
+- opening Settings raised the main process to about **36 MB**;
+- after closing Settings and waiting, the pressure-relief pass reduced it to **33.2 MB**;
+- same-run retained delta versus cold baseline: **+14.3 MB**.
+
+Interpretation:
+- P8C proves a real portion of the post-Settings high-water mark was releasable allocator memory
+  (roughly 2.8 MB from the observed ~36 MB peak to 33.2 MB);
+- however most of the one-time increase survives maximal malloc-zone pressure relief, so it is not
+  merely free heap pages;
+- the remaining footprint is dominated by process-wide AppKit/UI first-touch state and caches.
+
+New source-level finding:
+- `SettingsWindowController` explicitly builds the **entire Pro Settings tree first** on every open:
+  `NSSplitViewController` + `SidebarVC` + `DetailVC`, lays out the first detailed section,
+  installs detailed observers, selects the first sidebar row, and only then collapses to the compact
+  "Основное" screen;
+- the source comment itself says: "ОКНО СОБИРАЕТСЯ ВСЕГДА В ВИДЕ PRO, И ТОЛЬКО ПОТОМ ... СХЛОПЫВАЕТСЯ";
+- for Lite users opening the normal compact Settings screen this eagerly first-touches a large UI
+  subsystem that is not needed at all unless they choose "Все".
+
+Decision:
+- keep P8B compact lexicons and P8C one-shot allocator relief;
+- next experiment is to preserve the exact Pro UI but instantiate it lazily only when requested.
+
+---
+
+## Memory Optimization P8D — lazy Pro Settings construction
+
+Status: IMPLEMENTED; CI intentionally triggered by this commit.
+
+Purpose:
+- reduce the persistent Settings high-water mark without removing any settings or changing their UI;
+- avoid first-touching detailed AppKit controls on the common compact-settings path.
+
+Implementation:
+- Lite makes `NSSplitViewController`, `SidebarVC` and detailed `DetailVC` lazy;
+- when Lite starts in "Основное", it builds only the compact root controller plus shared window chrome;
+- detailed sidebar/split/detail objects, their observers and first-section layout are created only when:
+  - the user switches to "Все", or
+  - a deep link requests a detailed section;
+- Pro size is calculated at that moment using the same saved-height/first-section rules as before;
+- after Pro has been built, transitions and detailed Settings behavior use the same existing code paths;
+- full/non-Lite behavior is unchanged;
+- P8C's delayed allocator pressure relief remains after window close.
+
+Functional safety:
+- no setting removed or renamed;
+- no change to AppSettings persistence;
+- no change to layout detection, dictionaries, TypoFix, snippets/autoreplace, hotkeys or EventTap;
+- the only change is **when** the existing detailed Settings object graph is constructed.
+
+Runtime gate:
+1. fresh launch: record main-process RAM;
+2. open Settings and **do not switch to "Все"**; close it and wait 5-10 seconds;
+3. compare post-close RAM to P8C's **33.2 MB**;
+4. reopen Settings, switch to "Все", confirm sidebar/sections are visually and functionally identical;
+5. close again and record the Pro-touched high-water mark separately;
+6. verify retained input features.

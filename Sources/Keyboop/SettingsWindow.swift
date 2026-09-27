@@ -124,9 +124,19 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     /// view tree, so AppDelegate may drop its strong reference after the window is really closed.
     var onClosedForRelease: (() -> Void)?
 #endif
+#if KEYBOOP_LITE
+    /// P8D: the common Lite path opens the compact "Основное" screen. Do not instantiate the whole
+    /// Pro split/sidebar/detail tree until the user actually asks for it; first-touch AppKit caches
+    /// otherwise permanently raise the agent's footprint even after the window is closed.
+    private lazy var split = NSSplitViewController()
+    private lazy var sidebar = SidebarVC()
+    private lazy var detail = DetailVC()
+    private var proUIBuilt = false
+#else
     private let split = NSSplitViewController()
     private let sidebar = SidebarVC()
     private let detail = DetailVC()
+#endif
     /// Отдельный контроллер под корневой экран простого режима. Тот же класс, другая ширина колонки:
     /// `contentW` задаётся при создании, а держать два состояния в одном экземпляре значило бы
     /// пересобирать констрейнты на каждом переходе.
@@ -241,6 +251,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         self.init(window: window)
         window.delegate = self
 
+#if !KEYBOOP_LITE
         let sidebarItem = NSSplitViewItem(sidebarWithViewController: sidebar)
         sidebarItem.minimumThickness = DS.sidebarWidth
         sidebarItem.maximumThickness = DS.sidebarWidth
@@ -249,6 +260,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         if #available(macOS 26.0, *) { detailItem.automaticallyAdjustsSafeAreaInsets = true }
         split.addSplitViewItem(sidebarItem)
         split.addSplitViewItem(detailItem)
+#endif
 
         hostVC.view = NSView()
         hostVC.view.addSubview(bodyBox)
@@ -260,7 +272,16 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             bodyBox.bottomAnchor.constraint(equalTo: hostVC.view.bottomAnchor)
         ])
         window.contentViewController = hostVC
+#if !KEYBOOP_LITE
         setBody(split)
+#else
+        let liteStartsSimple = (AppSettings.shared.simpleMode || simpleHook)
+            && ProcessInfo.processInfo.environment["KEYBOOP_PRO"] != "1"
+        if !liteStartsSimple {
+            ensureProUI()
+            setBody(split)
+        }
+#endif
         // ⚠️ ПО ПЕРВОМУ РАЗДЕЛУ, А НЕ ПО САМОМУ ДЛИННОМУ (автор 17.08: «высота окна всех настроек
         // очень большая»). По самому длинному окно открывалось на всю высоту экрана ради раздела,
         // который человек, может, и не откроет, а первое впечатление о программе делает первый
@@ -268,11 +289,17 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         //
         // И высоту, которую человек выставил сам, запоминаем: своя привычная высота важнее любой
         // нашей подгонки, и переспрашивать её каждый запуск невежливо.
+#if KEYBOOP_LITE
+        if proUIBuilt {
+            window.setContentSize(proContentSize)
+        }
+#else
         let first = SettingsSection.sidebarCases.first ?? .switching
         let needed = detail.sectionHeight([first]) + DS.contentMargin * 2 + 16
         let saved = CGFloat(AppSettings.shared.proWindowHeight)
         let screenMaxH = (NSScreen.main?.visibleFrame.height ?? 1000) - 40
         window.setContentSize(NSSize(width: w0, height: min(saved > 200 ? saved : needed, screenMaxH)))
+#endif
         window.center()
         // Окно тянется ТОЛЬКО по высоте: ширина контента фиксирована (поля прижаты влево, тянуть
         // вширь незачем и некрасиво). minSize.width == maxSize.width → горизонтальный ресайз запрещён.
@@ -300,6 +327,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
            ProcessInfo.processInfo.environment["KEYBOOP_PRO"] != "1" {
             applyMode(animate: false)
         } else {
+#if KEYBOOP_LITE
+            ensureProUI()
+#endif
             // ⚠️ ПЕРЕКЛЮЧАТЕЛЬ ОБЯЗАН ПОКАЗЫВАТЬ ТО, ЧТО НА ЭКРАНЕ. Эта ветка показывает подробные
             // настройки, не трогая настройку человека, то есть ровно «гостевой заход»: без
             // `proVisit` окно открывалось в Pro, а переключатель подсвечивал «Основное».
@@ -324,6 +354,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         // трогаем, и окно ведёт себя как у любого обычного приложения.
         window.appearance = AppSettings.shared.appAppearance
 
+#if !KEYBOOP_LITE
         sidebar.onSelect = { [weak self] s in self?.detail.show(s) }
         detail.observeCapsRemap()
         if ReleaseFeatures.slap { detail.observeSlapAvailability() }
@@ -343,7 +374,51 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             }
         }
         sidebar.select(0, animated: false)
+#endif
     }
+
+#if KEYBOOP_LITE
+    /// Build the detailed Settings tree exactly once, and only if the user actually enters "Все"
+    /// or opens a deep-linked section. This preserves the original Pro UI while keeping the common
+    /// compact-settings path from first-touching NSSplitViewController/sidebar/detail machinery.
+    private func ensureProUI() {
+        guard !proUIBuilt else { return }
+        proUIBuilt = true
+
+        let sidebarItem = NSSplitViewItem(sidebarWithViewController: sidebar)
+        sidebarItem.minimumThickness = DS.sidebarWidth
+        sidebarItem.maximumThickness = DS.sidebarWidth
+        sidebarItem.canCollapse = false
+        let detailItem = NSSplitViewItem(viewController: detail)
+        if #available(macOS 26.0, *) { detailItem.automaticallyAdjustsSafeAreaInsets = true }
+        split.addSplitViewItem(sidebarItem)
+        split.addSplitViewItem(detailItem)
+
+        sidebar.onSelect = { [weak self] s in self?.detail.show(s) }
+        detail.observeCapsRemap()
+        if ReleaseFeatures.slap { detail.observeSlapAvailability() }
+        detail.onLanguageChanged = { [weak self] in
+            DispatchQueue.main.async {
+                self?.sidebar.refreshTitles()
+                self?.detail.reshow()
+                if let self, let p = self.modePicker, let host = p.superview {
+                    p.setTitles([L10n.t("mode.simple"), L10n.t("mode.pro")])
+                    host.setFrameSize(NSSize(width: p.frame.width + self.modeInset,
+                                             height: DS.titlebarHeight))
+                }
+            }
+        }
+        sidebar.select(0, animated: false)
+
+        let first = SettingsSection.sidebarCases.first ?? .switching
+        let needed = detail.sectionHeight([first]) + DS.contentMargin * 2 + 16
+        let saved = CGFloat(AppSettings.shared.proWindowHeight)
+        let screenMaxH = (NSScreen.main?.visibleFrame.height ?? 1000) - 40
+        proContentSize = NSSize(width: DS.minWindowWidth + 24,
+                                height: min(saved > 200 ? saved : needed, screenMaxH))
+        kbLog("memory: lazy-built Pro Settings UI")
+    }
+#endif
 
     /// Переключить окно между простым корневым экраном и полным Pro.
     ///
@@ -426,6 +501,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
                 }
             }
         } else {
+#if KEYBOOP_LITE
+            ensureProUI()
+#endif
             setBody(split)
             let w = proContentSize.width
             // Подробные настройки тянутся по высоте, и это правильно: список разделов длинный.
@@ -434,7 +512,11 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             setContent(proContentSize, animate: animate)
             detail.reshow()
         }
+#if KEYBOOP_LITE
+        if proUIBuilt { sidebar.refreshBackLink(hidden: true) }
+#else
         sidebar.refreshBackLink(hidden: true)      // ссылка в сайдбаре больше не нужна: переключатель в заголовке
+#endif
         refreshModeLink()
     }
 
@@ -707,6 +789,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func show(section: SettingsSection? = nil) {
+#if KEYBOOP_LITE
+        if section != nil || !showingSimple { ensureProUI() }
+#endif
         // Явный раздел означает Pro: в простом экране разделов нет вовсе, и открыть их можно только
         // выйдя из него. Иначе диплинк вида «--settings=voice» открывал бы пустое окно.
         // ⚠️ ПО СОСТОЯНИЮ, А НЕ ПО НАСТРОЙКЕ — четвёртый пойманный экземпляр одной болезни
