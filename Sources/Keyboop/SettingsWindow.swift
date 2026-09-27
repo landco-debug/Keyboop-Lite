@@ -75,7 +75,13 @@ enum SettingsSection: Int, CaseIterable {
     /// разделов, из списка приходилось выбрасывать разделы, где после фильтра оставались одни
     /// заголовки. Теперь простой режим это ОТДЕЛЬНЫЙ корневой экран без бокового меню, а сайдбар
     /// существует только в подробном, где показывается всё.
-    static var sidebarCases: [SettingsSection] { allCases.filter { $0 != .ambiguous } }
+    static var sidebarCases: [SettingsSection] {
+#if KEYBOOP_LITE
+        return allCases.filter { ![.ambiguous, .voice, .translate, .updates].contains($0) }
+#else
+        return allCases.filter { $0 != .ambiguous }
+#endif
+    }
     var l10nKey: String {
         switch self {
         case .switching: return "sec.switching"
@@ -1103,11 +1109,13 @@ final class DetailVC: NSViewController {
     private var wordInput: NSTextField?
     /// Строка исхода под полем: добавлено / уже было / уже бережём / не сработает (P3.5).
     private weak var wordOutcome: NSTextField?
+#if !KEYBOOP_LITE
     private var voiceModelStatus: [String: NSTextField] = [:]
     /// Кнопки «Скачать» по id модели. Как и метки выше, ПЕРЕрегистрируются при каждой сборке
     /// раздела — иначе обработчик прогресса держал бы ссылку на кнопку, которой уже нет.
     private var voiceModelButton: [String: NSButton] = [:]
     private var historyWC: VoiceHistoryWindowController?
+#endif
     private let docView = FlippedView()
     private let column = FlippedView()           // колонка контента с ограниченной шириной
     private var contentStack: NSStackView?
@@ -1343,10 +1351,15 @@ final class DetailVC: NSViewController {
         case .exceptions: built = buildExceptions()
         case .ambiguous:  built = buildAmbiguous()
         case .snippets:   built = buildSnippets()
+#if KEYBOOP_LITE
+        case .translate, .voice, .updates:
+            built = NSView()
+#else
         case .translate:  built = buildTranslate()
         case .voice:      built = buildVoice()
-        case .general:    built = buildGeneral()
         case .updates:    built = buildUpdates()
+#endif
+        case .general:    built = buildGeneral()
         case .privacy:    built = buildPrivacy()
         case .about:      built = buildAbout()
         }
@@ -1512,6 +1525,7 @@ final class DetailVC: NSViewController {
             self.scheduleSlapReshow()
         }
     }
+#if !KEYBOOP_LITE
     /// Дешёвая сигнатура файлов моделей на диске (имя+размер+mtime). Меняется ровно тогда, когда
     /// модель скачали/удалили/подменили — включая удаление ИЗВНЕ через Finder.
     private func modelsSignature() -> String {
@@ -1539,6 +1553,7 @@ final class DetailVC: NSViewController {
     /// Скрытый ввод мог наладиться (или начаться), пока окно было в фоне. Раздел «Приватность»
     /// показывает объяснение по состоянию, значит состояние надо пере-спрашивать: иначе человек
     /// видит инструкцию про уже снятую блокировку или, наоборот, не видит про текущую.
+#endif
     private var lastSecureShown: Bool?
     func revalidatePrivacyIfShown() {
         guard currentSection == .privacy else { return }
@@ -1548,6 +1563,9 @@ final class DetailVC: NSViewController {
         reshow()
     }
 
+#if KEYBOOP_LITE
+    func revalidateVoiceIfShown() {}
+#else
     func revalidateVoiceIfShown() {
         guard currentSection == .voice else { return }
         let sig = modelsSignature()
@@ -1555,6 +1573,8 @@ final class DetailVC: NSViewController {
         lastModelsSignature = sig
         reshow()
     }
+#endif
+
     func reload() {
         ignoredChips?.set(exceptions.ignoredSorted)
         learnedChips?.set(exceptions.learnedSorted)
@@ -1796,6 +1816,7 @@ final class DetailVC: NSViewController {
     private weak var trPackLabel: NSTextField?
     private weak var trDownloadBtn: NSButton?
 
+#if !KEYBOOP_LITE
     private func buildTranslate() -> NSView {
         // ⚠️ ЧЕСТНО ГОВОРИМ, ЕСЛИ ПЕРЕВОДА НЕТ (05.08.2026). Apple Translation это macOS 15+, наш пол
         // macOS 13. Раньше на 13 и 14 раздел выглядел полностью рабочим: тумблер включён, хоткей
@@ -1913,6 +1934,8 @@ final class DetailVC: NSViewController {
             NSWorkspace.shared.open(url)
         }
     }
+
+#endif
 
     /// Маленькая «клавишная» плашка с моноширинным текстом — для показа хоткея.
     private func keycapLabel(_ text: String) -> NSView {
@@ -3169,6 +3192,7 @@ final class DetailVC: NSViewController {
     /// Обновления — ОТДЕЛЬНЫЙ раздел (раньше тонули в «Общих» → реальный пользователь не нашёл, где
     /// обновлять). Зависимость: «Ставить сразу без вопросов» требует включённой проверки, поэтому при
     /// нём тумблер «Проверять обновления» форсится ВКЛ и НЕДОСТУПЕН (нельзя выключить, не сняв silent).
+#if !KEYBOOP_LITE
     private func buildUpdates() -> NSView {
         let checkBtn = NSButton(title: L10n.t("upd.check"), target: self, action: #selector(checkForUpdates))
         checkBtn.bezelStyle = .rounded; checkBtn.controlSize = .regular
@@ -3219,6 +3243,8 @@ final class DetailVC: NSViewController {
     /// делаем: ради него пришлось бы менять FeedbackWindow, а пользы против диагностики немного.
     @objc private func reportUpdateProblem() { FeedbackWindowController.shared.show() }
 
+#endif
+
     /// Все ползунки громкости в одном месте: ключ запоминания → чтение/запись значения.
     private var volumeSliders: [(key: String, get: () -> Double, set: (Double) -> Void)] {
         [("switch",    { self.settings.soundVolume },          { self.settings.soundVolume = $0 }),
@@ -3265,6 +3291,7 @@ final class DetailVC: NSViewController {
         // Перерисовать раздел: ползунки должны показать новые значения (0 либо восстановленные).
         DispatchQueue.main.async { [weak self] in self?.reshow() }
     }
+#if !KEYBOOP_LITE
     @objc private func toggleAutoCheck(_ s: NSSwitch) { UpdaterController.shared.automaticChecks = (s.state == .on) }
     @objc private func toggleSilentUpdate(_ s: NSSwitch) {
         settings.silentAutoUpdate = (s.state == .on)
@@ -3291,6 +3318,8 @@ final class DetailVC: NSViewController {
         UpdaterController.shared.noteChannelChanged()
     }
     @objc private func checkForUpdates() { UpdaterController.shared.checkNow() }
+
+#endif
 
     /// О программе — версия, лицензия, обновления.
     private func buildAbout() -> NSView {
@@ -3396,10 +3425,14 @@ final class DetailVC: NSViewController {
     }
     @objc private func meowEasterEgg() { CueSynth.versionTap() }
 
+#if !KEYBOOP_LITE
     private var welcomeTourWC: WelcomeWindowController?
+#endif
     @objc private func showWelcomeTour() {
+#if !KEYBOOP_LITE
         if welcomeTourWC == nil { welcomeTourWC = WelcomeWindowController() }
         welcomeTourWC?.show()
+#endif
     }
 
     private var whatsNewWindow: NSWindow?
@@ -3474,6 +3507,7 @@ final class DetailVC: NSViewController {
 
     // MARK: helpers
 
+#if !KEYBOOP_LITE
     private func buildVoice() -> NSView {
         voiceModelStatus.removeAll()
         voiceModelButton.removeAll()
@@ -4120,6 +4154,8 @@ final class DetailVC: NSViewController {
         }
     }
 
+#endif
+
     private func soundVolumeSlider() -> NSView {
         let s = NSSlider(value: settings.soundVolume, minValue: 0, maxValue: 1,
                          target: self, action: #selector(soundVolChanged(_:)))
@@ -4136,6 +4172,7 @@ final class DetailVC: NSViewController {
         }
     }
 
+#if !KEYBOOP_LITE
     private func voiceVolumeSlider() -> NSView {
         let s = NSSlider(value: settings.voiceSoundVolume, minValue: 0, maxValue: 1,
                          target: self, action: #selector(voiceVolChanged(_:)))
@@ -4581,6 +4618,8 @@ final class DetailVC: NSViewController {
         return l
     }
 
+#endif
+
     private func title(_ t: String) -> NSTextField {
         let l = NSTextField(labelWithString: t); l.font = .systemFont(ofSize: 20, weight: .semibold); l.textColor = .labelColor; l.alignment = .left; return l
     }
@@ -4704,12 +4743,17 @@ final class DetailVC: NSViewController {
     }
     /// «Написать разработчику» — теперь наша форма (mailto хрупок: у многих Mail.app не настроен,
     /// кнопка открывала пустоту, и фидбэк умирал молча). Почта осталась фолбэком ВНУТРИ формы.
-    @objc private func openFeedback() { FeedbackWindowController.shared.show() }
+    @objc private func openFeedback() {
+#if !KEYBOOP_LITE
+        FeedbackWindowController.shared.show()
+#endif
+    }
     @objc private func openTelegram() { Permissions.openTelegramChannel() }
     @objc private func openLog() { Permissions.openDiagnosticLog() }
     @objc private func openPerms() { Permissions.openAccessibilitySettings() }
     /// Ручной доступ к микрофону: не спрашивали → системный промпт; иначе — открыть
     /// панель System Settings (отозвать/выдать вручную). После промпта — обновить заголовок.
+#if !KEYBOOP_LITE
     @objc private func requestMic() {
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .notDetermined:
@@ -4721,12 +4765,15 @@ final class DetailVC: NSViewController {
             Permissions.openMicrophoneSettings()
         }
     }
+#endif
+
     @objc private func langChanged(_ s: NSPopUpButton) {
         settings.language = [0: "auto", 1: "ru", 2: "en"][s.indexOfSelectedItem] ?? "auto"
         onLanguageChanged?()
         // Меню в статус-баре локализуется отдельно — пнём его пересобраться.
         NotificationCenter.default.post(name: .keyboopLanguageChanged, object: nil)
     }
+#if !KEYBOOP_LITE
     @objc private func toggleVoice(_ s: NSSwitch) { settings.voiceEnabled = (s.state == .on) }
     @objc private func voiceModeChanged(_ s: NSSegmentedControl) { settings.voiceHoldMode = s.selectedSegment == 1 ? "toggle" : "hold" }
     @objc private func toggleVoiceHistory(_ s: NSSwitch) {
@@ -4847,8 +4894,11 @@ final class DetailVC: NSViewController {
         if historyWC == nil { historyWC = VoiceHistoryWindowController() }
         historyWC?.show()
     }
+#endif
+
     // MARK: - G: Mic selector
 
+#if !KEYBOOP_LITE
     private func micSelectorControl() -> NSView {
         let pop = NSPopUpButton()
         pop.addItem(withTitle: L10n.t("voice.micSystem"))
@@ -4873,6 +4923,8 @@ final class DetailVC: NSViewController {
     @objc private func micSelectorChanged(_ s: NSPopUpButton) {
         settings.voiceMicUID = (s.selectedItem?.representedObject as? String) ?? ""
     }
+#endif
+
     /// Ссылка-раскрывашка вместо кнопки. Кнопка читалась как действие («скачать», «применить») и
     /// массивной плашкой перетягивала внимание с двух рекомендованных моделей, хотя всё, что она
     /// делает — «покажи остальные». Правка 25.07.
@@ -4922,6 +4974,7 @@ final class DetailVC: NSViewController {
         }
     }
 
+#if !KEYBOOP_LITE
     @objc private func activateModelAction(_ s: NSButton) {
         guard s.tag < unifiedCatalog.count else { return }
         activateModel(unifiedCatalog[s.tag])
@@ -5011,7 +5064,8 @@ final class DetailVC: NSViewController {
         }
         if m.engine == "whisper" { ModelDownloader.shared.delete(m.id, completion: finish) }
         else { ParakeetEngine.shared.deleteModel(completion: finish) }
-    }
+    }#endif
+
 }
 
 /// Flipped — контент идёт сверху вниз.

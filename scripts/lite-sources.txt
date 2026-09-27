@@ -23,7 +23,6 @@ Sources/Keyboop/ExceptionStore.swift
 Sources/Keyboop/ExtraWords.swift
 Sources/Keyboop/GlobeGuard.swift
 Sources/Keyboop/GlobeKey.swift
-Sources/Keyboop/HistoryGate.swift
 Sources/Keyboop/HotkeyRecorderPanel.swift
 Sources/Keyboop/IdleMonitor.swift
 Sources/Keyboop/InputLatency.swift
@@ -51,6 +50,8 @@ Sources/Keyboop/SecureInputPolicy.swift
 Sources/Keyboop/SecureInputProbe.swift
 Sources/Keyboop/SelectionText.swift
 Sources/Keyboop/SettingsWindow.swift
+Sources/Keyboop/SlapSPUDriver.swift
+Sources/Keyboop/SlapSPUEventCounter.swift
 Sources/Keyboop/SlapTypes.swift
 Sources/Keyboop/SnippetPicker.swift
 Sources/Keyboop/SnippetStore.swift

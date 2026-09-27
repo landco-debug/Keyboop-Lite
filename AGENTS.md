@@ -659,3 +659,36 @@ Next:
 - add a tiny pasteboard ownership bridge for retained PlainPaste/SelectionText without compiling
   ClipboardWatcher;
 - handle PersistentResourceGuard's slap-SPU coupling before the next deliberate CI probe.
+
+
+---
+
+## Surgical Commit S4F — isolate removed Settings subsystems
+
+Status: IMPLEMENTED; CI intentionally not triggered.
+
+Purpose:
+- keep the original Keyboop SettingsWindow implementation for retained sections while preventing
+  Lite from compiling voice, translation and updater implementation paths.
+
+Changes:
+- Lite sidebar now shows only retained sections; Voice, Translation and Updates are absent;
+- `buildSection` cannot enter removed builders in Lite;
+- translation, update and voice/model builders are compiled only in non-Lite;
+- voice-history/model properties and model revalidation are compiled out; Lite revalidation is a
+  no-op because the Voice section does not exist;
+- microphone/history/model actions are compiled out;
+- About keeps the upstream structure for now; feedback/welcome selectors are safe no-ops in Lite
+  until the cosmetic final trim;
+- `HistoryGate.swift` leaves the Lite allow-list because history UI/runtime is absent.
+
+Temporary compile bridge:
+- `SlapSPUDriver.swift` and `SlapSPUEventCounter.swift` are added to the allow-list only to satisfy
+  the retained PersistentResourceGuard's mixed Globe/SPU backend types;
+- no Slap detector is started in Lite;
+- a later cleanup step will split that mixed backend and remove these two files physically.
+
+Next:
+- trigger one deliberate CI probe;
+- use compiler evidence to remove remaining mixed-subsystem references before producing the first
+  downloadable artifact.
