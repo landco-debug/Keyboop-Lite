@@ -474,3 +474,25 @@ Build/test:
 Next:
 - S4D2: make EventTap's protocol and event-state machine omit dictation/translation/history hotkeys
   in Lite while leaving switching, autoreplace, case change, plain paste and snippet picking intact.
+
+
+---
+
+## Surgical Commit S3B — CI path fix
+
+Status: IMPLEMENTED.
+
+Evidence from S3A:
+- dictionary reconstruction passed exactly;
+- build did not reach Swift compilation;
+- upstream `build-app.sh` rejected GitHub's `$RUNNER_TEMP` path by design because it only permits
+  app bundles inside the repository or macOS system temporary directories.
+
+Change:
+- CI build target moved to `/private/tmp/Keyboop-Lite.app`;
+- artifact packaging still writes the ZIP to `$RUNNER_TEMP`;
+- no product source changed.
+
+Next:
+- inspect exactly one CI run;
+- if compilation reaches the first missing heavy dependency, remove only that boundary in S3C.

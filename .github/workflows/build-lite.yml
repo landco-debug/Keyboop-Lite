@@ -22,12 +22,12 @@ jobs:
       - name: Build app
         run: |
           chmod +x build-app.sh
-          KEYBOOP_BUILD_APP="$RUNNER_TEMP/Keyboop-Lite.app" ./build-app.sh
+          KEYBOOP_BUILD_APP="/private/tmp/Keyboop-Lite.app" ./build-app.sh
 
       - name: Package app
         if: success()
         run: |
-          ditto -c -k --sequesterRsrc --keepParent "$RUNNER_TEMP/Keyboop-Lite.app" "$RUNNER_TEMP/Keyboop-Lite.zip"
+          ditto -c -k --sequesterRsrc --keepParent "/private/tmp/Keyboop-Lite.app" "$RUNNER_TEMP/Keyboop-Lite.zip"
 
       - name: Upload artifact
         if: success()
