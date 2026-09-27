@@ -519,3 +519,48 @@ Correction:
 Next:
 - inspect exactly one CI run from this commit;
 - use only its first concrete compiler error for the next micro-step.
+
+
+---
+
+## Surgical Commit S4D2 — isolate EventTap voice/translation/history hotkeys
+
+Status: IMPLEMENTED; rebased after concurrent CI-harness correction.
+
+Purpose:
+- keep the original CGEventTap state machine for layout switching/autoreplace while ensuring Lite
+  never intercepts keys for removed dictation, translation or voice-history insertion features.
+
+Retained:
+- normal key buffering and auto-switch boundaries;
+- manual layout conversion;
+- instant layout switching / Globe handling;
+- Caps behavior;
+- snippet picker and autoreplace;
+- plain paste;
+- selection case change;
+- chatter protection and other original input-safety guards.
+
+Excluded from Lite:
+- voice Escape cancellation and voice key/modifier state machines;
+- dictation keyUp handling;
+- translation hotkey interception;
+- “paste last dictation” hotkey and SnippetPicker zero-row action;
+- EventTapHandler protocol requirements for removed Engine entry points.
+
+Legacy-hotkey arbitration:
+- in Lite, voice can no longer claim a modifier against the retained conversion hotkey; the
+  instant-switch ownership rule is unchanged.
+
+Method:
+- original upstream branches remain behind `#if !KEYBOOP_LITE`; retained event-flow code was not
+  rewritten.
+
+Concurrency note:
+- while S4D2 was being committed, another project worker advanced `main` with S3C to make CI use
+  `build-lite.sh`. S4D2 was rebased onto that newer main instead of force-updating or discarding
+  the CI correction.
+
+Next:
+- S4E: simplify SnippetPicker to snippets-only and remove HistoryGate from the Lite source list;
+- then isolate SettingsWindow voice/translation/update builders before the next compiler probe.

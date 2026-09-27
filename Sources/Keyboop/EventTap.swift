@@ -21,13 +21,17 @@ protocol EventTapHandler: AnyObject {
     /// Человек выбрал сниппет цифрой в списке (задача 17). Текст вставляется как есть,
     /// удалять нечего: триггер никто не печатал.
     func handleSnippetPicked(_ text: String)
+#if !KEYBOOP_LITE
     func handleVoiceBegin()
     func handleVoiceEnd()
     func handleTranslateHotkey()
+#endif
     /// Смена регистра выделенного текста (задача 122).
     func handleCaseHotkey()
+#if !KEYBOOP_LITE
     /// Вставить текст последней диктовки туда, где сейчас каретка (задача 242).
     func handlePasteDictationHotkey()
+#endif
 }
 
 /// Глобальный наблюдатель клавиатуры (CGEventTap, АКТИВНЫЙ `.defaultTap` — нужен Accessibility,
@@ -526,6 +530,7 @@ final class EventTap {
             // комбинацию), запускал СТАРОЕ действие, а окно настроек не получало событие —
             // «нажимаю переназначить, ничего не происходит» (репорты пользователей 25.07).
             if HotkeyRecording.active { return Unmanaged.passUnretained(event) }
+#if !KEYBOOP_LITE
             // Escape во время диктовки — отмена (если включено). Глотаем Esc, чтобы он не
             // улетел в активное приложение.
             // ⚠️ ESCAPE С ЗАЖАТЫМ МОДИФИКАТОРОМ — НЕ ОТМЕНА (решение автора, 03.08.2026).
@@ -549,6 +554,7 @@ final class EventTap {
                 if s.voiceHoldMode == "toggle" { voiceKeyArmed = false } else { voiceActive = false }
                 return swallowDown(keyCode)
             }
+#endif
             // Мгновенное переключение языка комбинацией (⌘Space/⌃Space/своя): ГЛОТАЕМ, чтобы не
             // сработало то, что висит на ней в системе (Spotlight и пр.) — иначе всплывут оба.
             // ⚠️ Гард !isEmpty обязателен: это был ЕДИНСТВЕННЫЙ наш хоткей без него (у перевода и у
@@ -624,6 +630,7 @@ final class EventTap {
                 loggedLang1Neighbor = true
                 kbLog("caps-режим: keyDown keyCode=\(keyCode), ожидаем LANG1=\(CapsRemap.lang1KeyCode) — если Caps «молчит», настоящий код таков")
             }
+#if !KEYBOOP_LITE
             // Voice hold-хоткей (диктовка) — перехватываем и ГЛОТАЕМ (вкл. autorepeat),
             // чтобы клавиша (⌥`) не печаталась во время записи.
             if isVoiceHotkey(keyCode, event.flags) {
@@ -644,6 +651,7 @@ final class EventTap {
                 }
                 return swallowDown(keyCode)   // глотаем ВСЕГДА (вкл. autorepeat) — чтобы клавиша не печаталась
             }
+#endif
             // Перевод выделенного по хоткею (по умолчанию ⌃⌥T). Глотаем, чтобы 'T' не печаталась.
             //
             // ⚠️ НО ТОЛЬКО ТАМ, ГДЕ ПЕРЕВОД ВООБЩЕ СУЩЕСТВУЕТ (аудит умолчаний, 05.08.2026).
@@ -656,6 +664,7 @@ final class EventTap {
             // передумал и продолжил печатать, отбирать у него нажатие за это нельзя.
             if SnippetPicker.shared.isOpen {
                 if keyCode == 53 { onMain { SnippetPicker.shared.hide() }; return swallowDown(keyCode) }
+#if !KEYBOOP_LITE
                 // Цифра `0` — нулевая строка «последняя диктовка» (задача 242). Своя цифра, ничью
                 // нумерацию не сдвигает; если строки на экране нет, клавиша человеку и остаётся.
                 if keyCode == 29, relevantMods(event.flags).isEmpty, SnippetPicker.shared.showsLastDictation {
@@ -665,6 +674,7 @@ final class EventTap {
                     }
                     return swallowDown(keyCode)
                 }
+#endif
                 if let d = Self.digitIndex(keyCode), let bank = Self.digitBank(relevantMods(event.flags)) {
                     // Нумерация продолжается модификаторами (автор 06.08): 1…9, затем ⇧1…⇧9, затем
                     // ⌘1…⌘9. Дальше только мышью — четвёртый ряд пришлось бы вешать на ⌥ или ⌃, а
@@ -707,6 +717,7 @@ final class EventTap {
                     return swallowDown(keyCode)
                 }
             }
+#if !KEYBOOP_LITE
             // Вставка последней диктовки. Стоит здесь же, среди «работы с чужим полем по сочетанию»,
             // и ДО раскладочных веток: клавиша с модификаторами не должна дойти до конверсии.
             if s.pasteDictationEnabled, keyMatches(keyCode, s.pasteDictationKeyCode) {
@@ -729,6 +740,7 @@ final class EventTap {
                     return swallowDown(keyCode)
                 }
             }
+#endif
             // key-режим: обычная клавиша + модификаторы.
             if s.hotkeyMode == "key", s.hotkeyKeyCode >= 0, keyMatches(keyCode, s.hotkeyKeyCode) {
                 let target = relevantMods(CGEventFlags(rawValue: s.hotkeyModifiers))
@@ -795,6 +807,7 @@ final class EventTap {
             // caps-режиму включиться между нажатием и отпусканием — и приложение получало клавишу,
             // которую нажали и никогда не отпустили. Теперь этот путь идёт через общую парность:
             // проглотили нажатие — проглотим и отпускание, не проглотили — пропустим оба.
+#if !KEYBOOP_LITE
             // Voice key-режим: в hold отпускание = стоп; в toggle keyUp лишь снимает armed.
             // ⚠️ Условия выровнены с keyDown-путём (isVoiceHotkey): раньше здесь не было ни
             // voiceEnabled, ни keyMatches — и состояние диктовки дёргалось на чужой клавише.
@@ -810,6 +823,7 @@ final class EventTap {
                     onMain { [weak self] in self?.handler?.handleVoiceEnd() }
                 }
             }
+#endif
             // ПАРНОСТЬ: глотаем отпускание ровно тех клавиш, чьё нажатие проглотили мы сами.
             if swallowedDownKeyCodes.remove(upKey) != nil { return nil }
         case .flagsChanged:
@@ -858,12 +872,16 @@ final class EventTap {
                     && HotkeyGuard.maskCovers(
                         keyCode: s.instantSwitchKeyCode,
                         mask: relevantMods(CGEventFlags(rawValue: s.instantSwitchMods)))
+#if KEYBOOP_LITE
+                let voiceOwnsThisModifier = false
+#else
                 let voiceOwnsThisModifier = s.voiceEnabled
                     && s.voiceHotkeyMode == "modkey"
                     && keyCode == Int64(s.voiceHotkeyKeyCode)
                     && HotkeyGuard.maskCovers(
                         keyCode: s.voiceHotkeyKeyCode,
                         mask: relevantMods(CGEventFlags(rawValue: s.voiceHotkeyModifiers)))
+#endif
                 conversionModifierClaimedHere = instantOwnsThisModifier || voiceOwnsThisModifier
             }
         }
@@ -962,6 +980,7 @@ final class EventTap {
         // Это тот же класс, что репорт #17 для одиночного модификатора, только в ветке 🌐, где мы
         // сочли проверку ненужной: у Fn отдельный флаг, но соседей по нему это не отменяет.
         else if !relevantMods(flags).isEmpty { fnArmed = false }
+#if !KEYBOOP_LITE
         // ⚠️ ВЗВОД ДИКТОВКИ СНИМАЕМ ЗДЕСЬ, ДО ВЕТКИ НИЖЕ, И ЭТО НЕ ПРИДИРКА К МЕСТУ.
         // Событие о ВТОРОМ модификаторе приходит с ЕГО собственным keyCode, а ветка диктовки
         // гейтится по НАШЕЙ клавише, то есть добавление ⇧ к зажатому ⌥ проходит мимо неё целиком.
@@ -1077,6 +1096,7 @@ final class EventTap {
             }
             // Провал ВНИЗ, к хоткею конверсии. См. предупреждение над блоком.
         }
+#endif
         switch s.hotkeyMode {
         case "modkey":
             // Конкретная клавиша-модификатор (правый ⌥ = keyCode 61 и т.п.) — tap по отпусканию.
@@ -1180,6 +1200,7 @@ final class EventTap {
         return globeIsOurHotkey
     }
 
+#if !KEYBOOP_LITE
     /// toggle-режим: нажал → старт, нажал ещё раз → стоп.
     /// ИСТОЧНИК ИСТИНЫ — реальное состояние записи (VoiceController.isRecording), НЕ локальный
     /// флаг voiceActive: он рассинхронивался, если begin() молча не стартовал (busy / микрофон
@@ -1205,6 +1226,8 @@ final class EventTap {
         voiceActive = !wasActive
     }
 
+#endif
+#if !KEYBOOP_LITE
     /// Совпадает ли событие с voice-хоткеем диктовки (клавиша + модификаторы).
     private func isVoiceHotkey(_ keyCode: Int64, _ flags: CGEventFlags) -> Bool {
         let s = AppSettings.shared
@@ -1215,6 +1238,7 @@ final class EventTap {
         return relevantMods(flags) == want
     }
 
+#endif
     /// Совпадение keyCode хоткея с учётом РАЗНЫХ клавиатур. Грейв-клавиша (`` ` ``/`~`) имеет разный keyCode
     /// на ANSI и ISO: ANSI grave=50; ISO — под Esc § (keyCode 10), а грейв уезжает к левому Shift (тоже 50).
     /// Пользователь жмёт «где ожидает тильду» (под Esc) → на ISO это 10. Считаем 10 и 50 взаимозаменяемыми,
