@@ -265,3 +265,55 @@ Build/test:
 
 Next:
 - inspect the next CI result and continue until the arm64 artifact is produced.
+
+
+---
+
+## Commit 6 — compact trigram storage, self-test and dependency guard
+
+Status: IMPLEMENTED, CI pending.
+
+Evidence from previous stage:
+- GitHub Actions run `36312536541` on commit `efb3a2bd...` completed successfully.
+- The executable was verified as `Mach-O 64-bit executable arm64`.
+- `codesign --verify --deep --strict` passed.
+- Artifact `Keyboop-Lite-arm64` was uploaded successfully (artifact id `10929284663`, size ~1.0 MB compressed).
+
+Purpose:
+- reduce the remaining language-model heap allocations before user-side memory measurement;
+- add deterministic functional checks to every build;
+- make CI prove that heavy frameworks did not leak back into the Lite target.
+
+Files changed:
+- `Sources/KeyboopLite/LanguageData.swift`
+- `Sources/KeyboopLite/SelfTest.swift` (new)
+- `Sources/KeyboopLite/main.swift`
+- `build-app.sh`
+- `.github/workflows/build-test.yml`
+- `README.md`
+- `AGENTS.md`
+
+Architecture:
+- trigram JSON is no longer shipped or decoded into resident Swift dictionaries;
+- during build, each trigram table is converted to sorted fixed-width 16-byte records:
+  three UInt32 Unicode scalar values + one Float32 probability;
+- runtime opens these files with `Data(..., .mappedIfSafe)` and uses allocation-free binary search;
+- large word lists keep the previous mmap + UInt32-offset architecture;
+- `--self-test` runs without creating the GUI or event tap and validates:
+  language-resource loading, RU/EN physical conversion, autoreplace canonicalization,
+  RU/EN dictionary membership, `ghbdtn → привет` detector behavior, and the upstream typo example
+  `тедефон → телефон`;
+- `build-app.sh` executes this self-test before packaging;
+- CI inspects `otool -L` and fails if AVFoundation, CoreML, SwiftUI, Translation, Sparkle,
+  FluidAudio, Whisper or ggml are linked;
+- CI also prints app and executable size for tracking.
+
+Build/test:
+- previous commit is the first confirmed green arm64 build.
+- this commit must pass the stricter self-test and linkage gate before being handed to the user.
+
+Next:
+- wait for CI;
+- if green, use that artifact as the first user-test build;
+- measure real resident memory on the user's M1/Sequoia with the settings window closed;
+- only after that expand behavioral parity for any concrete switching edge cases found in use.

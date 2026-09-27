@@ -13,13 +13,27 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+
       - name: Build Keyboop Lite
         run: bash build-app.sh
-      - name: Verify architecture and signature
+
+      - name: Verify architecture, signature and dependencies
         run: |
-          file "Keyboop Lite.app/Contents/MacOS/Keyboop Lite"
-          lipo -archs "Keyboop Lite.app/Contents/MacOS/Keyboop Lite"
+          BIN="Keyboop Lite.app/Contents/MacOS/Keyboop Lite"
+          file "$BIN"
+          test "$(lipo -archs "$BIN")" = "arm64"
           codesign --verify --deep --strict --verbose=2 "Keyboop Lite.app"
+
+          DEPS="$(otool -L "$BIN")"
+          echo "$DEPS"
+          if echo "$DEPS" | grep -Eiq 'AVFoundation|CoreML|SwiftUI|Translation|Sparkle|FluidAudio|whisper|ggml'; then
+            echo "Heavy dependency leaked into Lite binary"
+            exit 1
+          fi
+
+          du -sh "Keyboop Lite.app"
+          du -h "$BIN"
+
       - uses: actions/upload-artifact@v4
         with:
           name: Keyboop-Lite-arm64

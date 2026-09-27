@@ -1,4 +1,9 @@
 import AppKit
+import Darwin
+
+if CommandLine.arguments.contains("--self-test") {
+    exit(SelfTest.run())
+}
 
 let app = NSApplication.shared
 let delegate = AppDelegate()

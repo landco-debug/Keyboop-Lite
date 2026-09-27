@@ -24,12 +24,17 @@ The large RU/EN word lists are converted at build time to sorted UTF-8 line file
 at runtime. Keyboop Lite keeps only compact UInt32 line offsets instead of decoding hundreds of
 thousands of Swift String objects into Set<String>.
 
-Trigram tables remain JSON dictionaries in v0.1 and are the next candidate for compact storage if
-profiling shows they matter.
+The RU/EN trigram probability tables are also converted at build time. Each trigram is stored as one
+fixed 16-byte record (three Unicode scalar values + one Float32 probability), sorted and memory-mapped.
+Lookup is allocation-free binary search; there is no resident [String: Double] trigram dictionary.
 
 ## Build
 
-GitHub Actions builds the arm64 app. A local build requires the Apple Swift toolchain, but users do
-not need Xcode or Command Line Tools to run the produced artifact.
+GitHub Actions builds the arm64 app. The build runs a deterministic self-test before packaging and
+fails if heavy frameworks such as AVFoundation, CoreML, SwiftUI, Translation, Sparkle, FluidAudio,
+Whisper or ggml leak into the linked executable.
+
+A local build requires the Apple Swift toolchain, but users do not need Xcode or Command Line Tools
+to run the produced artifact.
 
 Upstream baseline: iffuno/keyboop 0.4.10 @ fb9bdde4eb8f13a486974cf102a8bec9d607e5d2.

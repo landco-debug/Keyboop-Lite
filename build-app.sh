@@ -17,16 +17,32 @@ for f in words_ru.json words_en.json trigrams_ru.json trigrams_en.json typo_rule
 done
 
 python3 - <<'PY'
-import json, pathlib
+import json, pathlib, struct
+
 p = pathlib.Path(".build-resources")
+
 for name in ("words_ru", "words_en"):
     words = json.loads((p / f"{name}.json").read_text(encoding="utf-8"))
     words = sorted({str(w).lower() for w in words if w})
     (p / f"{name}.txt").write_text("\n".join(words) + "\n", encoding="utf-8")
+
+for name in ("trigrams_ru", "trigrams_en"):
+    table = json.loads((p / f"{name}.json").read_text(encoding="utf-8"))
+    records = []
+    for key, value in table.items():
+        cps = [ord(ch) for ch in key]
+        if len(cps) != 3:
+            raise SystemExit(f"{name}: non-3-scalar trigram {key!r}")
+        records.append((cps[0], cps[1], cps[2], float(value)))
+    records.sort(key=lambda r: r[:3])
+    with (p / f"{name}.bin").open("wb") as f:
+        for record in records:
+            f.write(struct.pack("<IIIf", *record))
 PY
 
 cp .build-resources/words_ru.txt .build-resources/words_en.txt "$RES/"
-cp .build-resources/trigrams_ru.json .build-resources/trigrams_en.json .build-resources/typo_rules.json "$RES/"
+cp .build-resources/trigrams_ru.bin .build-resources/trigrams_en.bin "$RES/"
+cp .build-resources/typo_rules.json "$RES/"
 
 echo "▸ compiling arm64 release"
 swiftc -Osize "$SRC"/*.swift   -o "$OUT/MacOS/Keyboop Lite"   -target arm64-apple-macos14.0   -framework AppKit   -framework ApplicationServices   -framework Carbon   -framework ServiceManagement
@@ -51,6 +67,10 @@ cat > "$OUT/Info.plist" <<'PLIST'
 PLIST
 
 codesign --force --deep --sign - "$APP"
+
+echo "▸ running deterministic self-test"
+"$OUT/MacOS/Keyboop Lite" --self-test
+
 ditto -c -k --sequesterRsrc --keepParent "$APP" "Keyboop-Lite-arm64.zip"
 
 echo "✓ $APP"
