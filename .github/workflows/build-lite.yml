@@ -3,6 +3,8 @@ name: Build Keyboop Lite
 on:
   push:
     branches: [ main ]
+    paths:
+      - ".github/BUILD_LITE_TRIGGER"
   workflow_dispatch:
 
 permissions:

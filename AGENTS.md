@@ -564,3 +564,31 @@ Concurrency note:
 Next:
 - S4E: simplify SnippetPicker to snippets-only and remove HistoryGate from the Lite source list;
 - then isolate SettingsWindow voice/translation/update builders before the next compiler probe.
+
+
+---
+
+## CI load guard — restore explicit probe triggering
+
+Status: IMPLEMENTED.
+
+Reason:
+- a concurrent CI-harness correction temporarily changed `build-lite.yml` to run on every push;
+- that caused several macOS builds while surgical source commits were intentionally being staged;
+- the user explicitly requested low-load, staged GitHub work.
+
+Change:
+- keep the corrected S3C build command (`build-lite.sh`);
+- restore the original path gate: ordinary source commits do NOT launch CI;
+- CI launches automatically only when `.github/BUILD_LITE_TRIGGER` changes;
+- `workflow_dispatch` remains available for a deliberate manual probe.
+
+Concurrency handling:
+- no force-push and no CI-harness correction was discarded;
+- S3C's switch to the real Lite harness is preserved.
+
+Next:
+- let the already-running probe for `7902bf8...` finish;
+- read its compiler evidence;
+- make further source commits without CI;
+- trigger exactly one next probe only after the next coherent surgical batch.
