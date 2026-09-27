@@ -253,3 +253,42 @@ Safety state:
 Next:
 - rerun the complete baseline integrity check;
 - only after it passes begin S3: surgical exclusion of voice/audio/translation/update subsystems.
+
+
+---
+
+## Surgical Commit S3 — staged Lite build harness
+
+Status: IMPLEMENTED; CI intentionally not triggered by this commit.
+
+Purpose:
+- introduce a dedicated Lite-only build path without touching the upstream-heavy `build-app.sh`;
+- make the retained-source boundary explicit before product-code surgery;
+- ensure GitHub Actions runs only when a dedicated trigger file changes, so ordinary staged commits
+  do not spend macOS runner minutes or put unnecessary load on GitHub.
+
+Files added:
+- `build-lite.sh` — arm64 macOS 15+ app-bundle builder, ad-hoc signed, no vendor dependencies;
+- `scripts/lite-sources.txt` — exact retained Swift source allow-list;
+- `.github/workflows/build-lite.yml` — macos-26 Apple Silicon CI, artifact upload, forbidden-linkage check.
+
+Important:
+- S3 is infrastructure only. The allow-list deliberately excludes Whisper, Parakeet/FluidAudio,
+  audio recording/import, call recording, clipboard/voice history implementations, translation,
+  updater, feedback, model downloaders, voice UI and WelcomeWindow;
+- shared upstream files (AppDelegate/Engine/EventTap/MenuBarController/SettingsWindow/UIControls)
+  still reference some excluded symbols. Therefore S3 is NOT claimed to compile yet;
+- the first CI run will be triggered only after S4 removes those shared-file references in one
+  controlled surgical pass.
+
+Build policy:
+- runner: `macos-26`, matching the already proven Apple-Silicon GitHub Actions setup used in the
+  user's other projects;
+- target: `arm64-apple-macos15.0` for MacBook Air M1 / macOS Sequoia;
+- no Homebrew, no third-party build dependency, no Xcode/CLT requirement on the user's Mac;
+- artifact name: `Keyboop-Lite-macOS-Apple-Silicon`.
+
+Next:
+1. S4: remove excluded-subsystem references from shared upstream files while preserving retained UI.
+2. Change `.github/BUILD_LITE_TRIGGER` once and let CI compile exactly one time.
+3. Use compiler errors as the dependency map; do not guess or re-run until the next small fix set is committed.

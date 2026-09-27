@@ -1,0 +1,41 @@
+name: "Keyboop Lite Build"
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/BUILD_LITE_TRIGGER"
+
+permissions:
+  contents: read
+
+jobs:
+  build-lite:
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Build Apple Silicon Lite
+        run: bash build-lite.sh
+
+      - name: Verify forbidden vendor linkage is absent
+        run: |
+          BIN="build/Keyboop Lite.app/Contents/MacOS/Keyboop Lite"
+          test -x "$BIN"
+          if otool -L "$BIN" | grep -E 'Sparkle|whisper|FluidAudio'; then
+            echo "Forbidden heavy dependency linked into Lite"
+            exit 1
+          fi
+
+      - name: Package
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent \
+            "build/Keyboop Lite.app" "build/Keyboop-Lite-macOS-Apple-Silicon.zip"
+
+      - name: Upload
+        uses: actions/upload-artifact@v7
+        with:
+          name: Keyboop-Lite-macOS-Apple-Silicon
+          path: build/Keyboop-Lite-macOS-Apple-Silicon.zip
+          retention-days: 14
