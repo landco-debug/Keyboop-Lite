@@ -1219,3 +1219,45 @@ Success gate:
 4. no removed heavy framework returns;
 5. artifact uploads;
 6. then replace P6 with P7 for a fresh permission-flow test.
+
+
+---
+
+## Build Probe P7 Result — permission flow / tap timeout repair
+
+Status: SUCCESS.
+
+Evidence:
+- workflow run `36328853832`;
+- job `108646782186`;
+- artifact ID `10935311519`, name `Keyboop-Lite-macOS-Apple-Silicon`;
+- artifact size: 2,590,944 bytes;
+- dictionary restore, arm64 compile, strict signing verification, packaging and upload succeeded;
+- linkage remains Apple system frameworks + Swift runtime overlays;
+- no Whisper, FluidAudio/Parakeet, Sparkle or Translation framework returned.
+
+What P7 changes at runtime:
+- Lite no longer creates/retries the active event tap every 0.5 s while permission is unresolved;
+- exactly one native Accessibility request is initiated;
+- no Keyboop custom permission NSAlert or relaunch modal is stacked on top;
+- Accessibility fallback checks run off-main at 1 Hz;
+- active event tap is created only after a granted status is observed;
+- no synchronous TCC query is performed immediately after attaching the active tap.
+
+Why this addresses the user's observed Mac freeze:
+- the P6 screenshot's `health.tapSuspended` state can only be reached after the tap receives three
+  timeout-disable events in the 60-second storm window;
+- the old Lite permission choreography contained multiple synchronous TCC/tap operations on the main
+  runloop and an explicit post-start `AXIsProcessTrusted()` call while the active tap was already
+  installed;
+- P7 removes those overlaps from the Lite path.
+
+Runtime checkpoint:
+1. fully quit P6 and replace only `/Applications/Keyboop Lite.app` with P7;
+2. for a clean permission-flow test, toggle/remove the existing Lite Accessibility grant only if the
+   user intentionally wants to reproduce first-run permission behavior; otherwise normal launch is fine;
+3. confirm no cluster of Keyboop permission dialogs appears;
+4. confirm keyboard/mouse never freeze and menu never shows `tapSuspended`;
+5. confirm Lite starts automatically after Accessibility becomes granted;
+6. then continue the P6 functional checks: DoubleShift/F18, immediate Exit, dead UI copy,
+   auto-switch, TypoFix and Autoreplace.
