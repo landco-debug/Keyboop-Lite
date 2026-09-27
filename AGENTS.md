@@ -1181,3 +1181,18 @@ Runtime gate for P7:
 4. menu must not enter `tapSuspended`;
 5. after granting Accessibility, Lite should start automatically without app restart;
 6. retained auto-switch, TypoFix, Autoreplace and manual hotkeys must still work.
+
+
+---
+
+## Runtime Fix P7A-1 — pre-build TCC-call audit
+
+Status: IMPLEMENTED; CI intentionally not triggered.
+
+One additional duplicate TCC read was found during review:
+- Lite launch diagnostics called `Permissions.isTrusted()`;
+- a few milliseconds later `startLiteAccessibilityFlow()` called the same synchronous IPC again.
+
+Because P7's goal is a single, deterministic permission path, the Lite launch log no longer queries TCC.
+The first/only synchronous status read before any event tap exists now lives in
+`startLiteAccessibilityFlow()`; repeating probes remain off-main.

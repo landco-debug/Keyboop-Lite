@@ -330,7 +330,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let stamp = Bundle.main.infoDictionary?["KeyboopBuildStamp"] as? String ?? "?"
         let isDev = (Bundle.main.bundleIdentifier ?? "").hasSuffix(".dev")
 #if KEYBOOP_LITE
-        kbLog("launched; v\(curVer)\(isDev ? "-dev" : "") [build \(stamp)] (prev \(prevVer.isEmpty ? "—" : prevVer)); AX=\(Permissions.isTrusted())")
+        // Do not touch TCC here. startLiteAccessibilityFlow() performs the single pre-tap status
+        // read immediately below; duplicating it only adds another synchronous IPC during startup.
+        kbLog("launched; v\(curVer)\(isDev ? "-dev" : "") [build \(stamp)] (prev \(prevVer.isEmpty ? "—" : prevVer)); Lite permission flow pending")
 #else
         kbLog("launched; v\(curVer)\(isDev ? "-dev" : "") [build \(stamp)] (prev \(prevVer.isEmpty ? "—" : prevVer)); AX=\(Permissions.isTrusted()) InputMon=\(Permissions.inputMonitoringGranted())")
 #endif
