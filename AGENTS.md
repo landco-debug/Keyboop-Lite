@@ -1440,3 +1440,48 @@ Build Probe P8B:
   package uploads, removed heavy framework linkage does not return;
 - runtime gate: compare cold RAM to P8A's 33.2 MB baseline and then verify the same RU/EN samples,
   TypoFix, Autoreplace/snippets and manual hotkeys before any merge.
+
+
+---
+
+## Build Probe P8B Result — compact exact lexicon artifact
+
+Status: SUCCESS.
+
+Evidence:
+- workflow run `36330718004`;
+- job `108651976132`;
+- source commit `e89b75d6ffac89d7638940588cd7430d44ce8db6`;
+- artifact ID `10935413821`, name `Keyboop-Lite-macOS-Apple-Silicon`;
+- outer artifact size: 3,361,408 bytes;
+- compact lexicon generation completed before compilation:
+  - RU: 162,760 words;
+  - EN: 59,276 words;
+- all 67 retained Swift sources compiled;
+- signing verification, packaging and upload succeeded.
+
+Post-build artifact integrity audit:
+- unpacked artifact contains both canonical JSON resources and generated `.lex` resources for this
+  experimental checkpoint;
+- RU `.lex`: 162,760 lines, exactly the same unique word set as `words_ru.json`;
+- EN `.lex`: 59,276 lines, exactly the same unique word set as `words_en.json`;
+- both lexicons are correctly sorted by UTF-8 byte order used by the runtime binary search;
+- no base dictionary word was added, removed, normalized or changed.
+
+Linkage:
+- no Whisper;
+- no FluidAudio/Parakeet;
+- no Sparkle;
+- no Apple Translation framework;
+- direct linkage remains Apple system frameworks plus weak Swift overlays already present before P8B.
+
+Runtime checkpoint:
+1. replace P8A with P8B from the experimental branch;
+2. on a fresh process, wait about 10 seconds before opening Settings and record main-process RAM;
+3. compare against P8A cold baseline **33.2 MB**;
+4. type several known RU and EN cases that previously auto-switched correctly, including short/common
+   words, then test TypoFix and Autoreplace/snippets;
+5. open/close Settings once and record RAM again only as a secondary measurement;
+6. helper-process memory is tracked separately (P8A: 2.9 MB) and is not affected by P8B.
+
+Do not merge into main until on-device behavior confirms exact lookup parity.
