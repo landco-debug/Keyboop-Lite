@@ -1046,3 +1046,23 @@ Next:
 - verify compilation/linkage/artifact;
 - runtime test: assign DoubleShift, confirm no CleanupBuddy launch, confirm no phantom voice conflict,
   confirm Exit is immediate, and inspect General/Privacy/About/Basic screens for removed-feature text.
+
+
+---
+
+## Runtime/UI Fix P6A-1 — pre-build review correction
+
+Status: IMPLEMENTED; CI intentionally not triggered.
+
+Pre-build self-review found two issues in the P6A source commit before spending an Actions run:
+- the newly appended Lite L10n block needed a comma after the preceding full-build dictionary entry;
+- some new Lite explanatory copy still named removed features in phrases such as “Lite has no …”.
+  The user asked for those concepts to disappear from the Lite interface, not merely be described as absent.
+
+Fix:
+- repaired the L10n dictionary separator;
+- rewrote Lite Privacy/About copy to describe only retained behavior and local processing, without
+  naming removed subsystems.
+
+Next:
+- trigger one P6 build only after this correction.
