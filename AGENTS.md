@@ -692,3 +692,26 @@ Next:
 - trigger one deliberate CI probe;
 - use compiler evidence to remove remaining mixed-subsystem references before producing the first
   downloadable artifact.
+
+
+---
+
+## Build Probe P3 — post-S4F compiler check
+
+Status: TRIGGERED by this commit.
+
+Scope:
+- exactly one GitHub Actions macOS build is requested after the staged S4C-fix/S4E/S4F changes;
+- ordinary source commits remain gated and do not launch CI;
+- this probe must be inspected before any further compiler-driven source removal.
+
+Expected checks:
+- pinned Russian dictionary reconstruction;
+- arm64 Lite source allow-list compilation through `build-lite.sh`;
+- ad-hoc code signing;
+- final linkage listing;
+- artifact upload only if all previous stages succeed.
+
+Next:
+- inspect this exact workflow run;
+- fix only the next concrete compiler/linkage boundary it reports.
