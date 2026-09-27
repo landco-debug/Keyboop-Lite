@@ -1196,3 +1196,26 @@ One additional duplicate TCC read was found during review:
 Because P7's goal is a single, deterministic permission path, the Lite launch log no longer queries TCC.
 The first/only synchronous status read before any event tap exists now lives in
 `startLiteAccessibilityFlow()`; repeating probes remain off-main.
+
+
+---
+
+## Build Probe P7 — permission flow / tap timeout repair
+
+Status: TRIGGERED by this commit.
+
+Source under test:
+- `54698b11776346733e9b357b14522ac28ca1339b`.
+
+Purpose:
+- compile the Lite-only permission bootstrap;
+- verify no accidental full-build regression from conditional compilation;
+- recheck signing/package/linkage before another on-device permission test.
+
+Success gate:
+1. dictionary restore succeeds;
+2. arm64 compile succeeds;
+3. strict signing verification succeeds;
+4. no removed heavy framework returns;
+5. artifact uploads;
+6. then replace P6 with P7 for a fresh permission-flow test.
