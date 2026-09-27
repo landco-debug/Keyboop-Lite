@@ -1360,3 +1360,83 @@ Stable rollback remains:
 - `stable-p7` -> `6c4f829f04b4dd4a0fd4f91dfc1b3d802c2e947e`;
 - `main` remains on the P7 line;
 - all subsequent RAM work stays on `memory-p8-experiments`.
+
+
+---
+
+## P8A runtime result — Settings close does not return Activity Monitor memory to cold baseline
+
+Status: ON-DEVICE TESTED; functional regression not reported in this checkpoint, but RSS result is insufficient.
+
+Measured on MacBook Air M1 / macOS Sequoia with P8A:
+- first launch, before opening Settings: main Keyboop Lite process = **33.2 MB**;
+- persistent resource-guard helper = **2.9 MB**;
+- after opening Settings once, closing it, and waiting roughly 1-2 minutes:
+  main process = **45.2 MB**;
+- helper remained **2.9 MB**;
+- visible post-Settings delta versus cold main-process baseline = **+12.0 MB**.
+
+Interpretation:
+- dropping `AppDelegate.settingsWC` is still the correct object-lifetime behavior and prevents Lite
+  itself from intentionally owning the closed Settings tree forever;
+- however Activity Monitor did not fall back to 33.2 MB. AppKit/Foundation caches and Darwin malloc
+  are allowed to retain freed pages/arenas for later reuse, so object release does not imply an
+  immediate RSS/footprint contraction;
+- therefore P8A alone is not a useful user-visible RAM solution. Keep it isolated on the memory branch,
+  but do not spend further iterations trying to force AppKit to purge allocator caches.
+
+Decision:
+- proceed to the dominant always-resident allocation: the 162,760-word RU and 59,276-word EN base
+  dictionaries currently decoded into Swift `Set<String>` hash tables;
+- preserve every word and exact membership semantics.
+
+---
+
+## Memory Optimization P8B — compact exact word lexicons
+
+Status: IMPLEMENTED; CI intentionally triggered by this commit.
+
+Purpose:
+- reduce the **cold/background** footprint without changing detection quality;
+- replace only Lite's resident JSON -> `[String]` -> `Set<String>` representation of the two large
+  base word dictionaries.
+
+Implementation:
+- canonical `words_ru.json` and `words_en.json` remain the source of truth;
+- during GitHub Actions build, `scripts/make-compact-lexicons.swift` converts them to sorted,
+  newline-delimited UTF-8 `.lex` resources without deleting or normalizing any word;
+- Lite memory-maps the resulting files with `Data.ReadingOptions.mappedIfSafe`;
+- runtime keeps only 32-bit line-start offsets and performs exact binary search over UTF-8 bytes;
+- all `ExtraWords` sets remain the same small in-memory overlays and keep the same precedence;
+- if a compact resource is unexpectedly absent, Lite falls back to the original exact JSON/Set path
+  rather than silently changing behavior;
+- full/non-Lite Keyboop keeps its original `Set<String>` implementation.
+
+What is deliberately NOT changed:
+- no word is removed;
+- no Bloom filter/probabilistic membership;
+- no stemming, morphology, truncation or heuristic shortcut;
+- no change to LayoutDetector decision order, thresholds, trigrams, TypoFix rules, Engine, EventTap,
+  snippets/autoreplace, manual switching, hotkeys or permission flow;
+- trigram dictionaries remain unchanged for this experiment.
+
+Expected memory effect:
+- eliminate hundreds of thousands of long-lived Swift String/hash-bucket allocations from the Lite
+  base dictionaries;
+- mapped lexicon pages are file-backed/reclaimable, while line offsets are under ~1 MB for both
+  dictionaries combined;
+- exact on-device result must be measured; no target number is claimed before runtime evidence.
+
+Files changed:
+- `Sources/Keyboop/LayoutData.swift`;
+- new `scripts/make-compact-lexicons.swift`;
+- `build-lite.sh`;
+- `.github/BUILD_LITE_TRIGGER`;
+- `AGENTS.md`.
+
+Build Probe P8B:
+- trigger: `probe-p8b-compact-lexicons`;
+- success gate: lexicons generated, all retained Swift sources compile, strict signing succeeds,
+  package uploads, removed heavy framework linkage does not return;
+- runtime gate: compare cold RAM to P8A's 33.2 MB baseline and then verify the same RU/EN samples,
+  TypoFix, Autoreplace/snippets and manual hotkeys before any merge.

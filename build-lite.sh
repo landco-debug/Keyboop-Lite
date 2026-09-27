@@ -13,6 +13,15 @@ SOURCE_LIST="scripts/lite-sources.txt"
 rm -rf "$APP"
 mkdir -p "$(dirname "$BIN")" "$RES"
 
+echo "▸ Keyboop Lite: generating exact compact word lexicons"
+xcrun swift scripts/make-compact-lexicons.swift \
+  Sources/Keyboop/Resources/words_ru.json "$RES/words_ru.lex" \
+  Sources/Keyboop/Resources/words_en.json "$RES/words_en.lex"
+[[ -s "$RES/words_ru.lex" && -s "$RES/words_en.lex" ]] || {
+  echo "✗ compact lexicon generation failed"
+  exit 3
+}
+
 SOURCES=()
 while IFS= read -r line; do
   [[ -z "$line" || "$line" == \#* ]] && continue
