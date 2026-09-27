@@ -101,3 +101,75 @@ Build/test:
 
 Next:
 - create the first compilable Keyboop Lite skeleton and GitHub Actions workflow, then begin porting the switching/autoreplace core.
+
+
+---
+
+## Commit 2 — first working Lite architecture
+
+Status: IMPLEMENTED, awaiting CI validation.
+
+Purpose:
+- create the first real arm64 Keyboop Lite application;
+- physically exclude all voice/audio/translation/update frameworks from the target;
+- keep automatic switching plus the required Autoreplace feature family;
+- optimize the largest language dictionaries for resident memory from the first build.
+
+Files added:
+- `Sources/KeyboopLite/main.swift`
+- `Sources/KeyboopLite/AppDelegate.swift`
+- `Sources/KeyboopLite/AppSettings.swift`
+- `Sources/KeyboopLite/Engine.swift`
+- `Sources/KeyboopLite/Keymap.swift`
+- `Sources/KeyboopLite/LanguageData.swift`
+- `Sources/KeyboopLite/Stores.swift`
+- `Sources/KeyboopLite/TextTools.swift`
+- `Sources/KeyboopLite/SettingsWindow.swift`
+- `build-app.sh`
+- `.github/workflows/build-test.yml`
+- `README.md`
+- `LICENSE`
+- `THIRD_PARTY.md`
+
+Architecture:
+- AppKit status-bar application; no SwiftUI/WebView runtime.
+- One CGEventTap for keyboard processing.
+- Automatic RU/EN detection uses source/target dictionaries plus trigram plausibility.
+- RU/EN word lists are converted during CI from pinned upstream JSON into sorted newline UTF-8 and opened with `Data(..., .mappedIfSafe)`.
+- Only UInt32 line offsets are allocated for the large dictionaries; the words are not expanded into `Set<String>`.
+- Trigram tables remain in in-memory dictionaries for the first profile pass.
+- Autoreplace uses the same upstream-compatible UserDefaults keys `snippetsOrdered` and `textSnippets`.
+- One-time migration reads relevant preferences from the full Keyboop domain `ru.keyboop.app`, so an existing user's autoreplace lists, exceptions and text-correction toggles can carry over.
+- Plain-text paste reads the pasteboard only at the requested paste action; there is no clipboard polling/watcher.
+- Case change snapshots/restores the pasteboard only while the explicit case-change action runs.
+- Heavy upstream resources are pinned to upstream commit `fb9bdde4...` and downloaded only at build time, never at runtime.
+
+Current functionality:
+- automatic switching on Space / Enter / Tab;
+- exceptions;
+- layout/case-independent abbreviation autoreplace;
+- plain-text paste;
+- typo rules plus conservative transposition/double-letter repair;
+- two-leading-capitals repair;
+- selected-text case toggle;
+- explicit snippets via Ctrl+Option+S then 1–9;
+- settings for all of the above;
+- launch-at-login control;
+- Accessibility prompt;
+- menu-bar auto toggle / settings / quit.
+
+Build:
+- GitHub Actions workflow builds only arm64 for macOS 14+ and uploads `Keyboop-Lite-arm64.zip`.
+- Runtime links AppKit, ApplicationServices, Carbon and ServiceManagement only.
+- CI validation has not yet completed at the time this commit is being authored.
+
+Known limitations to test after first successful artifact:
+- the first Lite detector is intentionally smaller than upstream 0.4.10's many edge-case guards; functional parity will be expanded only where real tests show a difference;
+- settings UI is intentionally compact in v0.1 and will be visually refined after runtime correctness and memory are confirmed;
+- the first build uses the standard U.S./Russian physical key map for conversion; selected macOS input source switching is language-based.
+
+Next:
+- run CI, fix every compile/link error in separate documented commits;
+- obtain the first runnable artifact;
+- perform user E2E for switching + Autoreplace;
+- then measure clean-launch memory with the settings window closed.

@@ -1,0 +1,25 @@
+name: Build Test
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-arm64:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Keyboop Lite
+        run: bash build-app.sh
+      - name: Verify architecture and signature
+        run: |
+          file "Keyboop Lite.app/Contents/MacOS/Keyboop Lite"
+          lipo -archs "Keyboop Lite.app/Contents/MacOS/Keyboop Lite"
+          codesign --verify --deep --strict --verbose=2 "Keyboop Lite.app"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Keyboop-Lite-arm64
+          path: Keyboop-Lite-arm64.zip
+          retention-days: 7
