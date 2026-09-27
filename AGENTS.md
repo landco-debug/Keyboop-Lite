@@ -996,3 +996,53 @@ Next:
 - grant Accessibility and verify real keyboard operation;
 - then test auto-switch, TypoFix and Autoreplace;
 - only after runtime success measure RAM and continue trimming.
+
+
+---
+
+## Runtime/UI Fix P6A — ghost hotkeys, Lite copy, quit flow, F18 collision
+
+Status: IMPLEMENTED; CI intentionally not triggered by this commit.
+
+Trigger:
+- P5 passed the permission/install checkpoint on the target MacBook Air M1 / macOS Sequoia;
+- first functional UI test exposed four concrete retained-upstream leaks.
+
+Root causes and fixes:
+1. **Phantom voice hotkey conflict.**
+   - `HotkeyGuard.Slot.allCases` still included voice/translation/paste-last-dictation.
+   - their shared AppSettings defaults survived compilation, so removed voice could still “own” a
+     shortcut and block assignment in Lite.
+   - under `KEYBOOP_LITE`, those three slots now return no trigger. Retained slots are unchanged.
+2. **Quit confirmation.**
+   - Lite inherited the full app's modal confirmation, whose text also mentioned voice input.
+   - Lite now exits immediately from the menu; the full build keeps the original confirmation.
+3. **Removed-feature UI leakage.**
+   - Lite quick-action choices are now only Pause and Settings; stale saved full-app values are
+     normalized to Pause instead of surfacing “copy last dictation”.
+   - Lite simple/root settings no longer instantiate VoiceHotkeyControl or TranslateHotkeyControl;
+     it shows only retained auto-switch, TypoFix and manual-layout controls.
+   - Lite General, Privacy and About use dedicated copy with no voice/model/translation/update claims.
+   - Lite About omits dictated counters, voice credits, Welcome/What's New/update/feedback controls.
+   - Lite root footer reports only rescued-layout count.
+4. **DoubleShift → CleanupBuddy/F18.**
+   - root cause was not DoubleShift itself. A manual conversion in Chromium/Electron can use the
+     clipboard-read fallback; immediately after synthetic Cmd+C, `TextReplacer` deliberately posted
+     a sacrificial F18 event so Chromium/Figma would consume that event instead of the first real text
+     event.
+   - F18 is a real global shortcut on the target Mac (physical moon/F6 remapped to F18, macOS Shortcut
+     “Start Cleanup” bound to F18), so our synthetic sacrifice launched CleanupBuddy.
+   - sacrificial key changed from real F18/keyCode 79 to sentinel keyCode 255, already proven in this
+     codebase as a deliverable non-printing synthetic keyDown and not mappable to a physical F-key.
+   - F17…F20 are explicitly forbidden as future sacrificial fallbacks because users can bind them.
+
+Scope:
+- no change to layout-conversion algorithms, TypoFix, autoreplace stores or dictionary data;
+- no heavy subsystem restored;
+- full/non-Lite upstream behavior remains behind existing conditional compilation.
+
+Next:
+- trigger exactly one P6 build;
+- verify compilation/linkage/artifact;
+- runtime test: assign DoubleShift, confirm no CleanupBuddy launch, confirm no phantom voice conflict,
+  confirm Exit is immediate, and inspect General/Privacy/About/Basic screens for removed-feature text.

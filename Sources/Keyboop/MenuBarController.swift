@@ -1015,6 +1015,11 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         Permissions.openInputMonitoringSettings()
     }
     @objc private func quit() {
+#if KEYBOOP_LITE
+        // Lite is a small background utility: Exit means exit. There is no recording/session state
+        // whose accidental loss justifies a modal confirmation on every quit.
+        onQuit?()
+#else
         let alert = NSAlert()
         alert.messageText = L10n.t("menu.quitConfirm")
         alert.informativeText = L10n.t("menu.quitBody")
@@ -1023,5 +1028,6 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         alert.addButton(withTitle: L10n.t("menu.quit"))
         NSApp.activate(ignoringOtherApps: true)
         if alert.runModal() == .alertSecondButtonReturn { onQuit?() }
+#endif
     }
 }

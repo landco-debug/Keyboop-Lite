@@ -23,10 +23,17 @@ enum QuickAction: String, CaseIterable {
 
     /// Правый клик активирует Keyboop и теряет фокус чужого поля, поэтому ручной перевод текста ему
     /// предлагать нельзя. Порядок совпадает с прежним списком в настройках.
+#if KEYBOOP_LITE
+    // Lite physically has no voice/history runtime. Do not keep dead actions in the visible menu
+    // just because their legacy raw values remain in the shared settings model.
+    static let rightClickOptions: [QuickAction] = [.pause, .settings]
+    static let slapOptions: [QuickAction] = [.manualSwitchOrUndo, .pause, .settings]
+#else
     static let rightClickOptions: [QuickAction] = [.copyVoice, .pause, .dictate, .history, .settings]
     /// Шлепок не требует клика по строке меню, поэтому его безопасное основное действие — тот же
     /// ручной путь «переключить / отменить», который позже подключит runtime.
     static let slapOptions: [QuickAction] = [.manualSwitchOrUndo, .dictate, .pause, .history, .settings]
+#endif
 
     var l10nKey: String { "quick." + rawValue }
 }
@@ -284,7 +291,17 @@ final class AppSettings {
     /// печатающее в «текущее поле», напечатало бы в самого Keyboop. Копирование работает именно
     /// потому, что чужой фокус ему не нужен.
     var quickAction: String {
-        get { d.string(forKey: "quickAction") ?? "copyVoice" }
+        get {
+#if KEYBOOP_LITE
+            // Existing users may carry "copyVoice"/"dictate"/"history" from the full app. In Lite
+            // those values must not surface as a ghost option or execute an unrelated fallback.
+            let raw = d.string(forKey: "quickAction") ?? QuickAction.pause.rawValue
+            return QuickAction.rightClickOptions.contains(where: { $0.rawValue == raw })
+                ? raw : QuickAction.pause.rawValue
+#else
+            return d.string(forKey: "quickAction") ?? "copyVoice"
+#endif
+        }
         set { d.set(newValue, forKey: "quickAction") }
     }
 

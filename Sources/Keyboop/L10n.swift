@@ -1490,6 +1490,26 @@ enum L10n {
                            .en: "• Auto-switch layout on space/Enter/Tab.\n• Manual %@ — switch the last word (or just the language if nothing’s typed).\n• Voice typing: press the hotkey and speak — text appears (local, no internet).\n• Snippets: shortcut → phrase (layout and case don’t matter).\n• Exceptions: apps where switching isn’t wanted."],
         "about.nuanceTitle":[.ru: "Нюансы", .en: "Good to know"],
         "about.nuance":   [.ru: "Работает в фоне (значок у часов). При исправлении слов не трогает буфер обмена — печатает символы напрямую. Из твоего ввода и голоса наружу не уходит ничего; в сеть — только за моделями и обновлениями. Нужен доступ к «Универсальному доступу» (Accessibility), чтобы видеть и исправлять ввод.",
-                           .en: "Runs in the background (menu-bar icon). Doesn’t touch the clipboard when fixing words — it types characters directly. Nothing from your input or voice ever leaves the Mac; the network is used only for models and updates. Needs Accessibility access to see and fix input."]
+                           .en: "Runs in the background (menu-bar icon). Doesn’t touch the clipboard when fixing words — it types characters directly. Nothing from your input or voice ever leaves the Mac; the network is used only for models and updates. Needs Accessibility access to see and fix input."]        // ── Keyboop Lite: тексты только для сохранённого ядра ──
+        "lite.gen.themeHelp": [.ru: "«Как в системе» следует за оформлением macOS. «Светлое» и «Тёмное» закрепляют вид Keyboop независимо от системной темы.",
+                               .en: "“System” follows macOS appearance. “Light” and “Dark” pin Keyboop to that appearance regardless of the system theme."],
+        "lite.gen.iconHidden": [.ru: "⚠︎ Без значка и без языка Keyboop не виден в строке меню. Настройки можно открыть повторным запуском Keyboop Lite из папки «Программы»; авто-переключение продолжает работать в фоне.",
+                                .en: "⚠︎ With no icon and no language badge, Keyboop is invisible in the menu bar. Open Settings by launching Keyboop Lite again from Applications; auto-switching keeps running in the background."],
+        "lite.gen.silentSub": [.ru: "Выключите — Keyboop Lite не будет играть звуки переключения и исправления. Выбранная громкость сохранится.",
+                               .en: "Turn it off and Keyboop Lite will stop playing switching/correction sounds. Your volume setting is preserved."],
+        "lite.gen.accessHint": [.ru: "Нужен, чтобы Keyboop видел нажатия, исправлял текст и переключал раскладку. Без Accessibility ядро Lite не работает.",
+                                .en: "Needed so Keyboop can see keystrokes, correct text and switch the layout. The Lite core cannot work without Accessibility."],
+        "lite.priv.body": [.ru: "Keyboop Lite не следит за тобой: без телеметрии, аналитики и отправки набранного текста. Обработка раскладки, опечаток и автозамен выполняется на этом Mac.",
+                           .en: "Keyboop Lite does not track you: no telemetry, analytics, or sending what you type. Layout correction, typo fixing and autoreplace all run on this Mac."],
+        "lite.priv.body2": [.ru: "В Lite нет голосовых моделей, перевода, истории диктовки, облачных запросов и фоновой проверки обновлений. Сеть используется только когда ты сам открываешь внешнюю ссылку, например страницу поддержки.",
+                            .en: "Lite has no voice models, translation, dictation history, cloud requests, or background update checks. Network access happens only when you explicitly open an external link such as the support page."],
+        "lite.about.tagline": [.ru: "Keyboop Lite — лёгкое ядро Keyboop: переключение раскладки, исправление опечаток и автозамена без голосовых и сетевых подсистем.",
+                               .en: "Keyboop Lite is the lightweight Keyboop core: layout switching, typo fixing and autoreplace without voice or network subsystems."],
+        "lite.about.can": [.ru: "• Авто-исправление раскладки RU ↔ EN.\n• Ручной хоткей %@ — исправить последнее слово.\n• Исправление типичных опечаток и двух заглавных.\n• Автозамена и сниппеты.\n• Исключения для слов и программ.",
+                           .en: "• Automatic RU ↔ EN layout correction.\n• Manual %@ — fix the last word.\n• Common typo and double-capital correction.\n• Autoreplace and snippets.\n• Word and app exceptions."],
+        "lite.about.nuance": [.ru: "Работает в фоне и использует Accessibility для чтения клавиш и безопасной подстановки исправленного текста. Голосового ввода, перевода, истории диктовки и автообновления в Lite нет.",
+                              .en: "Runs in the background and uses Accessibility to read keystrokes and safely type corrected text. Lite has no voice input, translation, dictation history, or auto-updater."],
+        "lite.root.counter": [.ru: "Расколдовано %@", .en: "Unjinxed %@"],
+
     ]
 }

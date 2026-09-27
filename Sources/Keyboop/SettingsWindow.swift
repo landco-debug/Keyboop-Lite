@@ -1651,6 +1651,19 @@ final class DetailVC: NSViewController {
     /// Бокового меню нет вовсе: список разделов это обещание, что дальше есть ещё, а в простом
     /// режиме дальше ничего быть не должно.
     private func buildSimpleRoot() -> NSView {
+#if KEYBOOP_LITE
+        let manualKey = HotkeyControl()
+        let rows: [NSView] = [
+            switchRow(L10n.t("switch.auto"), L10n.t("switch.autoSub"), settings.autoEnabled,
+                      #selector(toggleAuto), help: L10n.t("switch.autoHelp"), key: "switch.auto"),
+            switchRow(L10n.t("switch.typoFix"), L10n.t("switch.typoFixSub"), settings.typoFix,
+                      #selector(toggleTypoFix), help: L10n.t("switch.typoFixHelp"), key: "switch.typoFix"),
+            controlRow(L10n.t("root.manual"), manualKey, subtitle: L10n.t("root.manualSub"),
+                       help: L10n.t("switch.manualHelp"), key: "switch.manual", wraps: true)
+        ]
+        let root = vstack([group(headerRoom), card(rows, vPad: 8), group(6), rootFooter()])
+        return root
+#else
         let translateAvailable: Bool
         if #available(macOS 15.0, *) { translateAvailable = true } else { translateAvailable = false }
 
@@ -1695,11 +1708,16 @@ final class DetailVC: NSViewController {
             c.widthAnchor.constraint(equalTo: manualKey.widthAnchor).isActive = true
         }
         return root
+#endif
     }
 
     /// Подвал: единственное место, где приложение говорит, что оно для тебя сделало.
     private func rootFooter() -> NSView {
+#if KEYBOOP_LITE
+        let t = String(format: L10n.t("lite.root.counter"), rescuedDisplay())
+#else
         let t = String(format: L10n.t("root.counters"), rescuedDisplay(), dictatedDisplay())
+#endif
         let l = NSTextField(labelWithString: t)
         l.font = .systemFont(ofSize: 11.5)
         l.textColor = .tertiaryLabelColor
@@ -2370,11 +2388,18 @@ final class DetailVC: NSViewController {
 
     /// Приватность — чистая страница доверия (только манифест, без посторонних контролов).
     private func buildPrivacy() -> NSView {
+#if KEYBOOP_LITE
+        let privacyBody = "lite.priv.body"
+        let privacyBody2 = "lite.priv.body2"
+#else
+        let privacyBody = "priv.body"
+        let privacyBody2 = "priv.body2"
+#endif
         return vstack([
             blockTitle("priv.title"),
-            sub(L10n.t("priv.body")),
+            sub(L10n.t(privacyBody)),
             group(2),
-            sub(L10n.t("priv.body2")),
+            sub(L10n.t(privacyBody2)),
             // ⚠️ ВТОРОЙ ПРОЦЕСС НАЗЫВАЕМ САМИ (задачи 96 + 35). Теперь он спит всю сессию,
             // поэтому объяснение тоже постоянно. Человек, увидевший в Мониторинге системы два
             // «Keyboop», должен найти объяснение у нас, а не гадать —
@@ -2421,6 +2446,18 @@ final class DetailVC: NSViewController {
 
         let perm = NSButton(title: L10n.t("priv.perm"), target: self, action: #selector(openPerms))
         perm.bezelStyle = .rounded; perm.controlSize = .regular
+
+#if KEYBOOP_LITE
+        let themeHelpKey = "lite.gen.themeHelp"
+        let hiddenIconKey = "lite.gen.iconHidden"
+        let silentSubKey = "lite.gen.silentSub"
+        let accessHintKey = "lite.gen.accessHint"
+#else
+        let themeHelpKey = "gen.themeHelp"
+        let hiddenIconKey = "gen.iconHidden"
+        let silentSubKey = "gen.silentSub"
+        let accessHintKey = "gen.accessHint"
+#endif
 
 #if !KEYBOOP_LITE
         let micGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
@@ -2566,7 +2603,7 @@ final class DetailVC: NSViewController {
                 controlRow(L10n.t("priv.lang"), langPop, key: "priv.lang"),
                 // Оформление стоит рядом с языком интерфейса не случайно: обе строки про то, КАК
                 // приложение выглядит, а не что оно делает. «Как в системе» по умолчанию.
-                controlRow(L10n.t("gen.theme"), themeSeg, help: L10n.t("gen.themeHelp"), key: "gen.theme"),
+                controlRow(L10n.t("gen.theme"), themeSeg, help: L10n.t(themeHelpKey), key: "gen.theme"),
                 switchRow(L10n.t("switch.login"), nil, settings.launchAtLogin, #selector(toggleLogin),
                           key: "switch.login")
             ]),
@@ -2588,23 +2625,23 @@ final class DetailVC: NSViewController {
         if settings.menuBarStyle == "hidden" {
             // Значок скрыт — всегда объясняем, как добраться до приложения. Текст зависит от языка:
             // виден язык → по клику на RU/EN открывается меню; ничего не видно → перезапуск из «Программ».
-            general.append(hint(L10n.t(settings.menuBarShowLanguage ? "gen.iconHiddenLang" : "gen.iconHidden")))
+            general.append(hint(L10n.t(settings.menuBarShowLanguage ? "gen.iconHiddenLang" : hiddenIconKey)))
         }
 #if KEYBOOP_LITE
         general.append(contentsOf: [
             group(6),
-            card([ switchRow(L10n.t("gen.silent"), L10n.t("gen.silentSub"),
+            card([ switchRow(L10n.t("gen.silent"), L10n.t(silentSubKey),
                              !settings.silentMode, #selector(toggleSoundsEnabled), key: "gen.silent") ]),
             group(6),
             sectionTitle(L10n.t("gen.access")),
             card([ buttonRow([perm]) ]),
             group(2),
-            hint(L10n.t("gen.accessHint"))
+            hint(L10n.t(accessHintKey))
         ])
 #else
         general.append(contentsOf: [
             group(6),
-            card([ switchRow(L10n.t("gen.silent"), L10n.t("gen.silentSub"),
+            card([ switchRow(L10n.t("gen.silent"), L10n.t(silentSubKey),
                              !settings.silentMode, #selector(toggleSoundsEnabled), key: "gen.silent") ]),
             group(6),
             // Захват буфера в историю (задача 228). Стоит в «Общих», а не в голосовом наборе
@@ -2622,7 +2659,7 @@ final class DetailVC: NSViewController {
             sectionTitle(L10n.t("gen.access")),
             card([ buttonRow([perm, mic]) ]),
             group(2),
-            hint(L10n.t("gen.accessHint")),
+            hint(L10n.t(accessHintKey)),
             group(2),
             hint(L10n.t("gen.micHint"))
         ])
@@ -3338,6 +3375,32 @@ final class DetailVC: NSViewController {
 
     /// О программе — версия, лицензия, обновления.
     private func buildAbout() -> NSView {
+#if KEYBOOP_LITE
+        let ver = (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "0.0.1"
+        return vstack([
+            blockTitle("about.title"),
+            sub(L10n.t("lite.about.tagline")),
+            group(10),
+            sectionTitle(L10n.t("about.whatTitle")),
+            sub(String(format: L10n.t("about.what"), hotkeyDisplayString())),
+            group(8),
+            sectionTitle(L10n.t("about.canTitle")),
+            sub(String(format: L10n.t("lite.about.can"), hotkeyDisplayString())),
+            group(8),
+            sectionTitle(L10n.t("about.nuanceTitle")),
+            sub(L10n.t("lite.about.nuance")),
+            group(10),
+            card([
+                controlRow(L10n.t("about.version"), versionValue(Changelog.versionWithName(ver)),
+                           key: "about.version"),
+                controlRow(L10n.t("about.license"), valueText(L10n.t("about.licenseVal")),
+                           key: "about.license"),
+                controlRow(L10n.t("about.rescued"), valueText(rescuedDisplay()), key: "about.rescued")
+            ]),
+            group(6),
+            hint(L10n.t("about.foot"))
+        ])
+#else
         let ver = (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "0.0.1"
         let fb = NSButton(title: L10n.t("about.fbBtn"), target: self, action: #selector(openFeedback))
         fb.bezelStyle = .rounded; fb.controlSize = .regular
@@ -3392,7 +3455,9 @@ final class DetailVC: NSViewController {
             group(2),
             hint(L10n.t("about.credits"))
         ])
+#endif
     }
+
     private func valueText(_ s: String) -> NSView {
         let l = NSTextField(labelWithString: s)
         l.font = .systemFont(ofSize: 13); l.textColor = .secondaryLabelColor

@@ -351,11 +351,19 @@ enum HotkeyGuard {
             case .convert:
                 return (s.hotkeyMode, s.hotkeyKeyCode, s.hotkeyModifiers)
             case .voice:
+#if KEYBOOP_LITE
+                return nil
+#else
                 guard s.voiceEnabled else { return nil }
                 return (s.voiceHotkeyMode, s.voiceHotkeyKeyCode, s.voiceHotkeyModifiers)
+#endif
             case .translate:
+#if KEYBOOP_LITE
+                return nil
+#else
                 // У перевода своего режима нет, он всегда «клавиша + модификаторы».
                 return ("key", s.translateHotkeyKeyCode, s.translateHotkeyModifiers)
+#endif
             case .instant:
                 guard s.instantSwitchEnabled else { return nil }
                 return (s.instantSwitchMode, s.instantSwitchKeyCode, s.instantSwitchMods)
@@ -369,8 +377,12 @@ enum HotkeyGuard {
                 guard s.caseChangeEnabled else { return nil }
                 return ("key", s.caseChangeKeyCode, s.caseChangeModifiers)
             case .pasteDictation:
+#if KEYBOOP_LITE
+                return nil
+#else
                 guard s.pasteDictationEnabled else { return nil }
                 return ("key", s.pasteDictationKeyCode, s.pasteDictationModifiers)
+#endif
             }
         }
     }
