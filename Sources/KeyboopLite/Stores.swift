@@ -15,11 +15,21 @@ final class ExceptionStore {
         force = Set((d.array(forKey: "forceSwapWords") as? [String] ?? []).map { $0.lowercased() })
     }
 
-    func contains(_ word: String) -> Bool { ignored.contains(word.lowercased()) || learned.contains(word.lowercased()) }
-    func forceContains(_ word: String) -> Bool { force.contains(word.lowercased()) }
+    func contains(_ word: String) -> Bool {
+        let w = word.lowercased()
+        return ignored.contains(w) || learned.contains(w)
+    }
+
+    func forceContains(_ word: String) -> Bool {
+        force.contains(word.lowercased())
+    }
 
     func setIgnored(_ words: [String]) {
-        ignored = Set(words.map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }.filter { !$0.isEmpty })
+        ignored = Set(
+            words
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+                .filter { !$0.isEmpty }
+        )
         d.set(Array(ignored).sorted(), forKey: "ignoredWords")
     }
 }
@@ -46,13 +56,15 @@ final class SnippetStore {
         rebuild()
     }
 
-    func expansion(for word: String) -> String? { index[Keymap.canonical(word)] }
+    func expansion(for word: String) -> String? {
+        index[Keymap.canonical(word)]
+    }
 
     private func rebuild() {
         index.removeAll(keepingCapacity: true)
         for (trigger, expansion) in pairs {
-            let key = Keymap.canonical(trigger)
-            if !key.isEmpty { index[key] = expansion }
+            let canonical = Keymap.canonical(trigger)
+            if !canonical.isEmpty { index[canonical] = expansion }
         }
     }
 }
@@ -87,6 +99,7 @@ final class TypoFix {
               let data = try? Data(contentsOf: url),
               let all = try? JSONDecoder().decode([String: [String: String]].self, from: data)
         else { return }
+
         ru = all["ru"] ?? [:]
         en = all["en"] ?? [:]
     }
@@ -98,33 +111,46 @@ final class TypoFix {
         guard isRu != isEn else { return nil }
         if LanguageData.shared.isWord(lower, cyrillic: isRu) { return nil }
 
-        if let fixed = (isRu ? ru : en)[lower] { return matchCase(fixed, like: word) }
+        if let fixed = (isRu ? ru : en)[lower] {
+            return matchCase(fixed, like: word)
+        }
 
         var candidates = Set<String>()
         let chars = Array(lower)
+
         if chars.count >= 3 {
             for i in 0..<(chars.count - 1) {
-                var c = chars
-                c.swapAt(i, i + 1)
-                let s = String(c)
-                if LanguageData.shared.isWord(s, cyrillic: isRu) { candidates.insert(s) }
+                var variant = chars
+                variant.swapAt(i, i + 1)
+                let candidate = String(variant)
+                if LanguageData.shared.isWord(candidate, cyrillic: isRu) {
+                    candidates.insert(candidate)
+                }
             }
+
             for i in 0..<(chars.count - 1) where chars[i] == chars[i + 1] {
-                var c = chars
-                c.remove(at: i)
-                let s = String(c)
-                if LanguageData.shared.isWord(s, cyrillic: isRu) { candidates.insert(s) }
+                var variant = chars
+                variant.remove(at: i)
+                let candidate = String(variant)
+                if LanguageData.shared.isWord(candidate, cyrillic: isRu) {
+                    candidates.insert(candidate)
+                }
             }
         }
+
         guard candidates.count == 1, let only = candidates.first else { return nil }
         return matchCase(only, like: word)
     }
 
     private func matchCase(_ fixed: String, like source: String) -> String {
-        if source.allSatisfy({ !$0.isLetter || $0.isUppercase }) { return fixed.uppercased() }
-        if source.first?.isUppercase == true {
-            return fixed.prefix(1).uppercased() + fixed.dropFirst()
+        if source.allSatisfy({ !$0.isLetter || $0.isUppercase }) {
+            return fixed.uppercased()
         }
+
+        if source.first?.isUppercase == true {
+            return fixed.prefix(1).uppercased() + String(fixed.dropFirst())
+        }
+
         return fixed
     }
 }

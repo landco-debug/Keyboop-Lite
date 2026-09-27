@@ -4,15 +4,16 @@ import ApplicationServices
 final class Engine {
     private let settings = AppSettings.shared
     private var tap: CFMachPort?
-    private var source: CFRunLoopSource?
+    private var runLoopSource: CFRunLoopSource?
     private var buffer = ""
     private var previousWord: String?
     private var snippetPickerArmed = false
 
     func start() -> Bool {
-        let mask = CGEventMask(1 << CGEventType.keyDown.rawValue)
-            | CGEventMask(1 << CGEventType.tapDisabledByTimeout.rawValue)
-            | CGEventMask(1 << CGEventType.tapDisabledByUserInput.rawValue)
+        let mask =
+            (CGEventMask(1) << CGEventType.keyDown.rawValue)
+            | (CGEventMask(1) << CGEventType.tapDisabledByTimeout.rawValue)
+            | (CGEventMask(1) << CGEventType.tapDisabledByUserInput.rawValue)
 
         let userInfo = UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
         guard let tap = CGEvent.tapCreate(
@@ -26,11 +27,14 @@ final class Engine {
                 return engine.handle(type: type, event: event)
             },
             userInfo: userInfo
-        ) else { return false }
+        ) else {
+            return false
+        }
 
         self.tap = tap
-        source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
-        if let source { CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes) }
+        let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
+        runLoopSource = source
+        CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
         return true
     }
@@ -40,17 +44,20 @@ final class Engine {
             if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
             return Unmanaged.passUnretained(event)
         }
+
         if event.getIntegerValueField(.eventSourceUserData) == TextTools.marker {
             return Unmanaged.passUnretained(event)
         }
 
         let key = CGKeyCode(event.getIntegerValueField(.keyboardEventKeycode))
-        let flags = event.flags
-        let relevant = flags.intersection([.maskCommand, .maskControl, .maskAlternate, .maskShift])
+        let relevantMask: CGEventFlags = [.maskCommand, .maskControl, .maskAlternate, .maskShift]
+        let relevant = event.flags.intersection(relevantMask)
 
         if snippetPickerArmed {
             snippetPickerArmed = false
-            if let digit = typedString(event).first, let n = Int(String(digit)), n >= 1, n <= 9 {
+            if let digit = typedString(event).first,
+               let n = Int(String(digit)),
+               (1...9).contains(n) {
                 let pairs = TextSnippetStore.shared.pairs
                 if n <= pairs.count {
                     TextTools.postText(pairs[n - 1].1)
@@ -60,18 +67,24 @@ final class Engine {
             }
         }
 
-        if settings.snippetPickEnabled, relevant == [.maskControl, .maskAlternate], key == 1 {
-            snippetPickerArmed = true // Ctrl+Option+S, then 1…9
+        if settings.snippetPickEnabled,
+           relevant == [.maskControl, .maskAlternate],
+           key == 1 {
+            snippetPickerArmed = true
             return nil
         }
 
-        if settings.caseChangeEnabled, relevant == [.maskControl, .maskAlternate], key == 32 {
-            TextTools.toggleSelectedCase() // Ctrl+Option+U
+        if settings.caseChangeEnabled,
+           relevant == [.maskControl, .maskAlternate],
+           key == 32 {
+            TextTools.toggleSelectedCase()
             buffer.removeAll(keepingCapacity: true)
             return nil
         }
 
-        if settings.plainPaste, relevant == [.maskCommand, .maskShift], key == 9 {
+        if settings.plainPaste,
+           relevant == [.maskCommand, .maskShift],
+           key == 9 {
             TextTools.pastePlain()
             buffer.removeAll(keepingCapacity: true)
             return nil
@@ -87,7 +100,8 @@ final class Engine {
             return Unmanaged.passUnretained(event)
         }
 
-        if [123, 124, 125, 126, 115, 119].contains(key) {
+        let navKeys: Set<CGKeyCode> = [123, 124, 125, 126, 115, 119]
+        if navKeys.contains(key) {
             buffer.removeAll(keepingCapacity: true)
             return Unmanaged.passUnretained(event)
         }
@@ -97,10 +111,13 @@ final class Engine {
             buffer.removeAll(keepingCapacity: true)
             guard !typed.isEmpty else { return Unmanaged.passUnretained(event) }
 
-            let snippetBoundary = (key == 49 && settings.snippetExpandSpace)
+            let snippetBoundary =
+                (key == 49 && settings.snippetExpandSpace)
                 || (key == 36 && settings.snippetExpandEnter)
                 || (key == 48 && settings.snippetExpandTab)
-            let textBoundary = (key == 49 && settings.autoSpace)
+
+            let textBoundary =
+                (key == 49 && settings.autoSpace)
                 || (key == 36 && settings.autoEnter)
                 || (key == 48 && settings.autoTab)
 
@@ -144,8 +161,10 @@ final class Engine {
             case .keep:
                 break
             case .convert(let toCyr):
-                let converted = Keymap.convert(core, toCyrillic: toCyr)
-                return Transform(text: converted + suffix, layoutDirection: toCyr)
+                return Transform(
+                    text: Keymap.convert(core, toCyrillic: toCyr) + suffix,
+                    layoutDirection: toCyr
+                )
             }
         }
 
@@ -156,6 +175,7 @@ final class Engine {
         if settings.twoCapsFix, let fixed = fixTwoLeadingCaps(core) {
             return Transform(text: fixed + suffix, layoutDirection: nil)
         }
+
         return nil
     }
 
@@ -173,8 +193,11 @@ final class Engine {
     private func fixTwoLeadingCaps(_ word: String) -> String? {
         var chars = Array(word)
         guard chars.count >= 3,
-              chars[0].isUppercase, chars[1].isUppercase, chars[2].isLowercase
+              chars[0].isUppercase,
+              chars[1].isUppercase,
+              chars[2].isLowercase
         else { return nil }
+
         chars[1] = Character(String(chars[1]).lowercased())
         return String(chars)
     }
@@ -182,8 +205,14 @@ final class Engine {
     private func typedString(_ event: CGEvent) -> String {
         var actual = 0
         var chars = [UniChar](repeating: 0, count: 8)
-        event.keyboardGetUnicodeString(maxStringLength: chars.count, actualStringLength: &actual, unicodeString: &chars)
+        chars.withUnsafeMutableBufferPointer { buffer in
+            event.keyboardGetUnicodeString(
+                maxStringLength: buffer.count,
+                actualStringLength: &actual,
+                unicodeString: buffer.baseAddress
+            )
+        }
         guard actual > 0 else { return "" }
-        return String(utf16CodeUnits: chars, count: actual)
+        return String(decoding: chars.prefix(actual), as: UTF16.self)
     }
 }

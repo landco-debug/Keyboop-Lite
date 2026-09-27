@@ -8,10 +8,14 @@ enum TextTools {
         guard !text.isEmpty else { return }
         let source = CGEventSource(stateID: .combinedSessionState)
         let utf16 = Array(text.utf16)
+
         let down = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true)
         down?.setIntegerValueField(.eventSourceUserData, value: marker)
-        down?.keyboardSetUnicodeString(stringLength: utf16.count, unicodeString: utf16)
+        utf16.withUnsafeBufferPointer { buffer in
+            down?.keyboardSetUnicodeString(stringLength: buffer.count, unicodeString: buffer.baseAddress)
+        }
         down?.post(tap: .cghidEventTap)
+
         let up = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false)
         up?.setIntegerValueField(.eventSourceUserData, value: marker)
         up?.post(tap: .cghidEventTap)
@@ -23,6 +27,7 @@ enum TextTools {
         down?.flags = flags
         down?.setIntegerValueField(.eventSourceUserData, value: marker)
         down?.post(tap: .cghidEventTap)
+
         let up = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false)
         up?.flags = flags
         up?.setIntegerValueField(.eventSourceUserData, value: marker)
@@ -46,17 +51,21 @@ enum TextTools {
             item.types.compactMap { type in item.data(forType: type).map { (type, $0) } }
         }
 
-        postKey(8, flags: .maskCommand) // Cmd+C
+        postKey(8, flags: .maskCommand)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
             guard let selected = pb.string(forType: .string), !selected.isEmpty, selected.count <= 5000 else {
                 restore(snapshot, to: pb)
                 return
             }
-            let isUpper = selected.filter(\.isLetter).allSatisfy(\.isUppercase)
+
+            let letters = selected.filter { $0.isLetter }
+            let isUpper = !letters.isEmpty && letters.allSatisfy { $0.isUppercase }
             let changed = isUpper ? selected.lowercased() : selected.uppercased()
+
             pb.clearContents()
             pb.setString(changed, forType: .string)
-            postKey(9, flags: .maskCommand) // Cmd+V
+            postKey(9, flags: .maskCommand)
+
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
                 restore(snapshot, to: pb)
             }
@@ -87,11 +96,14 @@ enum KeyboardLayout {
 
     private static func discover() {
         let list = TISCreateInputSourceList(nil, false).takeRetainedValue() as NSArray
-        for obj in list {
-            let source = unsafeBitCast(obj as AnyObject, to: TISInputSource.self)
-            guard let langsPtr = TISGetInputSourceProperty(source, kTISPropertyInputSourceLanguages) else { continue }
+        for object in list {
+            guard let source = object as? TISInputSource,
+                  let langsPtr = TISGetInputSourceProperty(source, kTISPropertyInputSourceLanguages)
+            else { continue }
+
             let langs = Unmanaged<CFArray>.fromOpaque(langsPtr).takeUnretainedValue() as NSArray
             let values = langs.compactMap { $0 as? String }.map { $0.lowercased() }
+
             if russian == nil, values.contains(where: { $0.hasPrefix("ru") }) { russian = source }
             if latin == nil, values.contains(where: { $0.hasPrefix("en") }) { latin = source }
         }

@@ -173,3 +173,40 @@ Next:
 - obtain the first runnable artifact;
 - perform user E2E for switching + Autoreplace;
 - then measure clean-launch memory with the settings window closed.
+
+
+---
+
+## Commit 3 — compile-path hardening before CI
+
+Status: IMPLEMENTED, awaiting CI validation.
+
+Purpose:
+- remove likely Swift/AppKit compile hazards before the first hosted build;
+- make GitHub Actions also run on pull requests so CI can be forced through a PR event if API-originated pushes do not trigger workflows.
+
+Files changed:
+- `Sources/KeyboopLite/Engine.swift`
+- `Sources/KeyboopLite/TextTools.swift`
+- `Sources/KeyboopLite/Stores.swift`
+- `Sources/KeyboopLite/SettingsWindow.swift`
+- `.github/workflows/build-test.yml`
+- `AGENTS.md`
+
+Details:
+- CGEvent masks are now built with explicit `CGEventMask(1) << rawValue`.
+- modifier filtering uses an explicit CGEventFlags mask.
+- navigation key codes use `Set<CGKeyCode>`.
+- Unicode read/write goes through Swift unsafe buffer pointers rather than relying on array pointer coercion.
+- case-conversion string assembly no longer mixes String and Substring operands.
+- checkbox actions use a dedicated NSButton subclass with a retained Swift closure instead of an Objective-C associated-object helper.
+- settings tabs are constructed explicitly and the default NSWindow style is left intact.
+- CI now listens to `pull_request` as well as `push` and `workflow_dispatch`.
+
+Build/test:
+- source-level hardening only; hosted compilation is the next gate.
+
+Next:
+- push a tiny CI-bootstrap branch and open a PR if no push run appears;
+- inspect exact compiler errors from the hosted macOS runner;
+- fix only evidence-backed failures in the next documented commit.
