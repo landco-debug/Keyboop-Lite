@@ -292,3 +292,23 @@ Next:
 1. S4: remove excluded-subsystem references from shared upstream files while preserving retained UI.
 2. Change `.github/BUILD_LITE_TRIGGER` once and let CI compile exactly one time.
 3. Use compiler errors as the dependency map; do not guess or re-run until the next small fix set is committed.
+
+
+---
+
+## Build Probe P1 — first retained-source compiler pass
+
+Status: TRIGGERED intentionally as a diagnostic build.
+
+Purpose:
+- spend one macOS Actions run to let Swift report every remaining reference from shared upstream
+  files into subsystems already excluded by `scripts/lite-sources.txt`;
+- use compiler output as the dependency map instead of making a large speculative edit.
+
+Trigger:
+- `.github/BUILD_LITE_TRIGGER` = `probe-p1`.
+
+Expected result:
+- compilation may fail; that is acceptable for P1;
+- no source/product behavior is changed by this probe;
+- next commit must address only the concrete unresolved symbols reported by this run.
