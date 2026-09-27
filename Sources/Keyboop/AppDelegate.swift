@@ -1382,6 +1382,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.mainMenu = main
     }
 
+#if KEYBOOP_LITE
+    /// P8C: AppKit tears down the Settings object graph, but macOS libmalloc may keep the now-free
+    /// heap pages in process arenas. Activity Monitor then shows the UI high-water mark indefinitely
+    /// even though Keyboop no longer owns those objects.
+    ///
+    /// Apple exposes malloc_zone_pressure_relief specifically for this: goal=0 asks for maximal
+    /// release, zone=nil examines all malloc zones. We call it once, well after windowWillClose and
+    /// off the event-tap/main runloop. Reopening Settings before the delayed trim cancels the trim.
+    private func scheduleLiteHeapReliefAfterSettingsClose() {
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            guard let self else { return }
+            let shouldTrim = DispatchQueue.main.sync { self.settingsWC == nil }
+            guard shouldTrim else { return }
+            let started = ProcessInfo.processInfo.systemUptime
+            let released = malloc_zone_pressure_relief(nil, 0)
+            let ms = Int((ProcessInfo.processInfo.systemUptime - started) * 1000)
+            kbLog("memory: malloc pressure relief released \(released / 1_048_576) MB in \(ms) ms")
+        }
+    }
+#endif
+
     private func openSettings(section: SettingsSection? = nil) {
         if settingsWC == nil {
             let controller = SettingsWindowController()
@@ -1396,6 +1417,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                           self.settingsWC === controller else { return }
                     self.settingsWC = nil
                     kbLog("memory: released closed Settings window")
+                    self.scheduleLiteHeapReliefAfterSettingsClose()
                 }
             }
 #endif

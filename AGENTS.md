@@ -1485,3 +1485,65 @@ Runtime checkpoint:
 6. helper-process memory is tracked separately (P8A: 2.9 MB) and is not affected by P8B.
 
 Do not merge into main until on-device behavior confirms exact lookup parity.
+
+
+---
+
+## P8B runtime result — compact lexicons materially reduce cold RAM; Settings still ratchets footprint
+
+Status: ON-DEVICE TESTED.
+
+Measured on MacBook Air M1 / macOS Sequoia:
+- P8A cold main process before opening Settings: **33.2 MB**;
+- P8B cold main process before opening Settings: **21.7 MB**;
+- cold-main reduction from compact exact lexicons: **11.5 MB (~34.6%)**;
+- persistent resource-guard helper remains **2.9 MB**;
+- after one Settings open/close and several minutes idle, P8B main process settles around **39.7 MB**;
+- therefore the Settings high-water delta in P8B is about **+18.0 MB** and still does not naturally
+  return to the 21.7 MB cold baseline.
+
+Conclusion:
+- P8B is a successful direction for always-resident memory: exact dictionary behavior was preserved
+  while the cold main process fell from 33.2 MB to 21.7 MB;
+- P8A object release by itself is not enough to make Activity Monitor fall after Settings closes;
+- the remaining post-Settings footprint is consistent with freed AppKit/Foundation allocations being
+  retained by Darwin malloc zones/caches rather than an intentional strong reference from AppDelegate.
+
+---
+
+## Memory Optimization P8C — reclaim freed Settings heap pages
+
+Status: IMPLEMENTED; CI intentionally triggered by this commit.
+
+Purpose:
+- preserve the successful P8B cold footprint and make memory used transiently by Settings eligible to
+  return to the OS after the window is actually closed;
+- do this without changing Settings UI, stored values, switching algorithms, dictionaries or input path.
+
+Implementation:
+- after P8A has dropped the last AppDelegate strong reference to the closed Settings controller,
+  schedule one delayed allocator pressure-relief pass;
+- the pass runs after 2 seconds on a utility queue, never in `windowWillClose` and never directly on
+  the event-tap/main runloop;
+- if Settings was reopened during that delay, the trim is cancelled;
+- call public macOS `malloc_zone_pressure_relief(nil, 0)`: NULL zone examines all zones, zero goal asks
+  for maximal releasable-page pressure relief;
+- log released bytes and elapsed time for runtime evidence.
+
+Safety:
+- this API only asks libmalloc to unmap pages that are already free; it does not free live objects;
+- no retained feature logic changes;
+- one-shot invocation only after Settings close, not a periodic timer;
+- full/non-Lite path is unchanged.
+
+Files changed:
+- `Sources/Keyboop/AppDelegate.swift`;
+- `.github/BUILD_LITE_TRIGGER`;
+- `AGENTS.md`.
+
+Runtime gate:
+1. fresh launch: confirm P8C remains near P8B cold baseline (~21.7 MB main);
+2. open Settings, close it, then wait 5-10 seconds;
+3. check whether main-process memory now falls materially below P8B's post-close ~39.7 MB;
+4. reopen Settings and verify identical UI/state;
+5. verify auto-switch, TypoFix, Autoreplace/snippets and manual hotkeys.
