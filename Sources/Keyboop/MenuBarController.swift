@@ -10,6 +10,13 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     private let settings = AppSettings.shared
     private var pollTimer: Timer?
 
+    var onOpenSettings: (() -> Void)?
+    /// Открыть настройки сразу на «Приватности» — туда ведёт строка про скрытый ввод.
+    var onOpenPrivacy: (() -> Void)?
+    var onToggleAuto: ((Bool) -> Void)?
+    var onQuit: (() -> Void)?
+    var needsPermission = false
+
 #if !KEYBOOP_LITE
     // Живой waveform в строке меню во время записи: «K» + столбики по громкости.
     private let waveBars = 5
@@ -18,21 +25,14 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     private var wavePeak: Float = 0.03
     private var waveTimer: Timer?
 
-    var onOpenSettings: (() -> Void)?
-    /// Открыть настройки сразу на «Приватности» — туда ведёт строка про скрытый ввод.
-    var onOpenPrivacy: (() -> Void)?
     var onShowVoiceHistory: (() -> Void)?
     /// Старт диктовки из быстрого действия (задача 21).
     var onQuickDictate: (() -> Void)?
-    var onToggleAuto: ((Bool) -> Void)?
     var onCheckUpdates: (() -> Void)?
-    var onQuit: (() -> Void)?
     /// ⌥-клик по значку: скрытая запись звонка (задача 230).
     var onToggleCallRecording: (() -> Void)?
     private var callRecording = false
-    var needsPermission = false
     private var voiceState: VoiceController.State = .idle
-
 #endif
     /// Настоящий логотип Keyboop (белая фигура + альфа) для waveform в строке меню. Грузим один раз.
     private static let markImage: NSImage? = {
@@ -449,6 +449,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         button.imagePosition = .imageOnly
     }
 
+#endif
+
     /// Иконка пункта меню: монохромный SF Symbol как template — систему тонирует она сама, и в тёмной
     /// теме, и на подсвеченном пункте. Размер берём от шрифта меню, а не константой: иначе на крупном
     /// системном шрифте иконки окажутся мелкими марками.
@@ -485,7 +487,6 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     /// Содержимое по-прежнему пересобирается в момент открытия, через `menuNeedsUpdate`.
     private let menu = NSMenu()
 
-#endif
     private func buildMenu() {
         menu.delegate = self
         guard let button = statusItem.button else { return }
@@ -909,6 +910,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         item.submenu = sub
         return item
     }
+#endif
 
     private func startPolling() {
         // Лёгкий опрос текущей раскладки для индикатора.
@@ -928,7 +930,6 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     /// программа видит и почему она молчит», и исчезает оттуда, когда мешать перестало.
     @objc private func showSecureInputHelp() { onOpenPrivacy?() }
 
-#endif
     @objc private func toggleAuto() {
         let newValue = !settings.autoEnabled
         settings.autoEnabled = newValue
@@ -975,11 +976,11 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         NSPasteboard.general.kbNoteOurs()   // иначе история буфера запишет нашу же копию (задача 228)
         VoiceIndicator.shared.showToast(L10n.t("menu.copyLastDone"))
     }
+#endif
     /// Пауза изменилась: меню пересобирается при открытии само, но значок и подсказка живут
     /// отдельно, и им нужен толчок.
     func refreshAfterPauseChange() { applyIconStyle() }
 
-#endif
     @objc private func resumePause() { Pause.stop() }
 
     /// Минуты приходят в `tag` пункта — см. сборку подменю «Не мешать».

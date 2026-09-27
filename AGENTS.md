@@ -592,3 +592,26 @@ Next:
 - read its compiler evidence;
 - make further source commits without CI;
 - trigger exactly one next probe only after the next coherent surgical batch.
+
+
+---
+
+## Surgical Commit S4C-fix — restore retained MenuBar members in Lite
+
+Status: IMPLEMENTED; CI intentionally not triggered.
+
+Compiler evidence:
+- the first real `build-lite.sh` probe showed retained menu-bar members hidden inside the
+  non-Lite voice guard.
+
+Fix:
+- Settings/Privacy/Auto/Quit callbacks and `needsPermission` compile in Lite;
+- common menu object, icon rendering helper, polling, secure-input navigation and pause refresh
+  compile in Lite;
+- waveform/dictation/history/update/call-recording state remains excluded;
+- upstream menu implementation is preserved; no replacement controller was written.
+
+Next:
+- S4E: remove voice-history coupling from SnippetPicker;
+- S4F: isolate voice/translation/update-only SettingsWindow helpers;
+- trigger one CI probe only after those staged commits.
