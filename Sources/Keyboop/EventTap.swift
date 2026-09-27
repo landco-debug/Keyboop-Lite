@@ -807,6 +807,7 @@ final class EventTap {
             // caps-режиму включиться между нажатием и отпусканием — и приложение получало клавишу,
             // которую нажали и никогда не отпустили. Теперь этот путь идёт через общую парность:
             // проглотили нажатие — проглотим и отпускание, не проглотили — пропустим оба.
+            let upKey = event.getIntegerValueField(.keyboardEventKeycode)
 #if !KEYBOOP_LITE
             // Voice key-режим: в hold отпускание = стоп; в toggle keyUp лишь снимает armed.
             // ⚠️ Условия выровнены с keyDown-путём (isVoiceHotkey): раньше здесь не было ни
@@ -814,7 +815,6 @@ final class EventTap {
             // Само ГЛОТАНИЕ отсюда убрано: им теперь ведает парность (ниже). Если keyDown прошёл в
             // приложение (нажали `` ` `` без ⌥), то и keyUp обязан пройти — иначе система считает
             // клавишу зажатой, и у человека умирает пробел (репорты #13/#22/#30).
-            let upKey = event.getIntegerValueField(.keyboardEventKeycode)
             if s.voiceEnabled, s.voiceHotkeyMode == "key", keyMatches(upKey, s.voiceHotkeyKeyCode) {
                 voiceKeyArmed = false
                 if s.voiceHoldMode != "toggle", voiceActive {

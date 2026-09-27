@@ -636,3 +636,26 @@ Fix:
 Next:
 - isolate voice/history/translation/update-only SettingsWindow helpers;
 - then remove HistoryGate from the Lite allow-list if no retained references remain.
+
+
+---
+
+## Surgical Commit S4E-fix — remove two residual dictation references
+
+Status: IMPLEMENTED; CI intentionally not triggered.
+
+Compiler evidence from run 36319116988:
+- `Engine.init` still assigned SnippetPicker's removed “last dictation” callback;
+- EventTap's retained keyUp pairing used `upKey`, but S4D2 had accidentally declared it inside the
+  non-Lite voice guard.
+
+Fix:
+- Engine's last-dictation picker callback is now non-Lite only;
+- `upKey` is declared before the voice guard so retained swallowed-key pairing works in Lite;
+- no layout-switching, autoreplace or snippet insertion behavior was changed.
+
+Next:
+- S4F: isolate SettingsWindow voice/translation/update-only UI/helpers;
+- add a tiny pasteboard ownership bridge for retained PlainPaste/SelectionText without compiling
+  ClipboardWatcher;
+- handle PersistentResourceGuard's slap-SPU coupling before the next deliberate CI probe.

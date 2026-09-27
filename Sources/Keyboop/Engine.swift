@@ -275,12 +275,14 @@ final class Engine: EventTapHandler {
                 guard let text = SnippetPicker.shared.pick(index: idx) else { return }
                 self?.handleSnippetPicked(text)
             }
+#if !KEYBOOP_LITE
             // Нулевая строка «последняя диктовка» — тот же обработчик, что у её хоткея: одна дорога
             // вставки, со всеми отказами и защитами, а не вторая копия рядом.
             SnippetPicker.shared.onPickLastDictation = { [weak self] in
                 guard SnippetPicker.shared.pickLastDictation() else { return }
                 self?.handlePasteDictationHotkey()
             }
+#endif
             // Открытие и закрытие Spotlight системой не объявляется, поэтому наблюдатель сообщает
             // об этом сам — и дальше всё идёт тем же путём, что и обычная смена программы.
             SpotlightWatch.onChange = { [weak self] in
