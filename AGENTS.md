@@ -372,3 +372,44 @@ Known remaining compiler blockers from P2:
 Next:
 - S4C: surgically remove Lite-only MenuBar voice/history/update/feedback paths while retaining
   original Auto, Pause, permissions/status, Settings and Quit UI.
+
+
+---
+
+## Surgical Commit S4C — trim menu-bar runtime to Lite scope
+
+Status: IMPLEMENTED; CI not triggered by this commit.
+
+Purpose:
+- keep the original Keyboop menu-bar/status implementation for layout switching while compiling
+  voice/history/update/feedback/call-recording UI and runtime out of Lite.
+
+Retained in Lite:
+- original status icon and language display;
+- health/permission warning state;
+- Auto-switch toggle;
+- Pause / “Do not disturb” menu and resume/start actions;
+- Settings;
+- Quit;
+- original non-Latin menu shortcut twin logic.
+
+Excluded from Lite:
+- dictation waveform/state and microphone submenu;
+- voice history and “copy last dictation”;
+- hidden Option-click call recording;
+- updater and feedback menu rows;
+- voice/history right-click quick actions.
+
+Implementation:
+- upstream code is preserved behind `#if !KEYBOOP_LITE`;
+- no replacement MenuBar controller was written;
+- retained Pause behavior remains original; only the voice-HUD toast is omitted because that HUD
+  belongs to the removed dictation subsystem.
+
+Build/test:
+- no GitHub Actions run spent on S4C;
+- conditional-compilation balance was checked on the generated file before commit.
+
+Next:
+- S4D: isolate Engine and EventTap voice/translation/history branches; add only switching-relevant
+  `Warm.swift` support already present in the source allow-list.

@@ -10,6 +10,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     private let settings = AppSettings.shared
     private var pollTimer: Timer?
 
+#if !KEYBOOP_LITE
     // Живой waveform в строке меню во время записи: «K» + столбики по громкости.
     private let waveBars = 5
     private var waveTargets: [CGFloat]
@@ -32,6 +33,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     var needsPermission = false
     private var voiceState: VoiceController.State = .idle
 
+#endif
     /// Настоящий логотип Keyboop (белая фигура + альфа) для waveform в строке меню. Грузим один раз.
     private static let markImage: NSImage? = {
         guard let url = Bundle.main.url(forResource: "menubar-mark", withExtension: "png"),
@@ -41,8 +43,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     init(layout: LayoutManager) {
         self.layout = layout
+#if !KEYBOOP_LITE
         waveTargets = Array(repeating: 0.08, count: waveBars)
         waveShown = waveTargets
+#endif
         super.init()
         Self.shared = self
         configureButton()
@@ -244,7 +248,11 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         let showLang = settings.menuBarShowLanguage
         // Пункт исчезает из строки меню, только если НЕТ и значка, и языка.
         statusItem.isVisible = !(style == "hidden" && !showLang)
+#if KEYBOOP_LITE
+        guard statusItem.isVisible, let button = statusItem.button else { return }
+#else
         guard statusItem.isVisible, voiceState == .idle, let button = statusItem.button else { return }
+#endif
         switch style {
         case "brand":
             button.image = Self.brandStatusImage ?? NSImage(systemSymbolName: "keyboard", accessibilityDescription: "Keyboop")
@@ -265,7 +273,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
 
     private func updateTitle() {
+#if !KEYBOOP_LITE
         if voiceState != .idle { return }   // во время диктовки иконку держит voice-индикатор
+#endif
         guard let button = statusItem.button else { return }
 
         // ЗНАЧОК РАССКАЗЫВАЕТ О СЕБЕ (P3.4). Пока Keyboop молчал — не выдан доступ, кто-то держит
@@ -302,6 +312,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         let mark = (needsPermission || AppHealth.iconDimmed(health)) ? "⚠︎" : ""
         let parts = [lang, mark].filter { !$0.isEmpty }
         let bare = settings.menuBarStyle == "hidden"
+#if !KEYBOOP_LITE
         if callRecording {
             // Красный кружок рядом со значком (задача 230): запись звонка нельзя забыть. Цвет тут
             // допустим, потому что подсказка значка говорит то же самое словами.
@@ -315,12 +326,14 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             button.toolTip = L10n.t("call.tip")
             return
         }
+#endif
         guard !parts.isEmpty else { button.title = ""; return }
         let text = parts.joined(separator: " ")
         // Без значка (hidden) подпись без ведущего пробела; со значком — с отступом от него.
         button.title = bare ? text : " \(text)"
     }
 
+#if !KEYBOOP_LITE
     /// Индикатор диктовки в статус-баре: запись / распознавание / покой.
     /// Запись звонка (задача 230): красный кружок в строке меню, пока идёт запись. Во время диктовки
     /// значок держит её индикатор, кружок вернётся вместе со значком покоя.
@@ -472,6 +485,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     /// Содержимое по-прежнему пересобирается в момент открытия, через `menuNeedsUpdate`.
     private let menu = NSMenu()
 
+#endif
     private func buildMenu() {
         menu.delegate = self
         guard let button = statusItem.button else { return }
@@ -498,7 +512,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         // отличить от «клик пришёл без ⌥».
         kbLog("значок: клик \(right ? "правый" : "левый")\(option ? " с ⌥" : ""), событие \(e.map { String($0.type.rawValue) } ?? "нет"), флаги события \(e?.modifierFlags.rawValue ?? 0), клавиатура \(hid.rawValue)")
         // ⌥-клик — скрытая запись звонка (задача 230): ни в меню, ни в настройках её нет.
+#if !KEYBOOP_LITE
         if !right, option { onToggleCallRecording?(); return }
+#endif
         if right { runQuickAction() } else { showMenu() }
     }
 
@@ -539,6 +555,17 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     /// ⚠️ Здесь не может быть действий, печатающих в «текущее поле». Клик по значку делает активными
     /// НАС, и любая вставка ушла бы в Keyboop, а не туда, где стоит курсор. Поэтому в списке только
     /// то, чему чужой фокус не нужен: копирование, пауза, диктовка и окно истории.
+#if KEYBOOP_LITE
+    private func runQuickAction() {
+        switch settings.quickAction {
+        case "pause":
+            if Pause.active { Pause.stop() }
+            else { Pause.start(minutes: settings.pauseMinutes) }
+        default:
+            onOpenSettings?()
+        }
+    }
+#else
     private func runQuickAction() {
         switch settings.quickAction {
         case "pause":
@@ -554,6 +581,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         }
     }
 
+#endif
     /// ⚠️ ПЕРЕСБОРКА В МОМЕНТ ОТКРЫТИЯ (30.07). Раньше меню собиралось только по событиям — смена
     /// раскладки, пара переключателей — и его содержимое было свежим лишь случайно. Пока все пункты
     /// были статичными, это сходило с рук. Как только появился пункт, зависящий от состояния истории
@@ -738,6 +766,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
         menu.addItem(.separator())
 
+#if !KEYBOOP_LITE
         // Быстрый доступ (в духе OpenSuperWhisper): микрофон.
         // ЯЗЫК РАСПОЗНАВАНИЯ УБРАН ОТСЮДА 30.07 (задача T40). Он меняется редко, дефолт «Авто» и так
         // стоит (AppSettings.voiceLanguage), а в настройках селектор уже есть — SettingsWindow
@@ -774,6 +803,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
         menu.addItem(.separator())
 
+#endif
         // Настройки — отдельной группой между двумя разделителями: системная шестерёнка не задевает соседей.
         let prefs = NSMenuItem(title: L10n.t("menu.settings"), action: #selector(openSettings), keyEquivalent: ",")
         prefs.target = self
@@ -785,6 +815,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
         menu.addItem(.separator())
 
+#if !KEYBOOP_LITE
         // «Обслуживание»: сначала «Проверить обновления», потом «Сообщить о проблеме» (порядок автора,
         // 30.07). Смысл порядка: человек, у которого что-то не так, сперва видит, что есть новая версия,
         // и только потом идёт писать нам. Половина репортов приходит с уже починенного старого билда.
@@ -809,6 +840,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
         menu.addItem(.separator())   // «Выйти» снова один за разделителем, чтобы не нажать случайно
 
+#endif
         let quit = NSMenuItem(title: L10n.t("menu.quit"), action: #selector(quit), keyEquivalent: "q")
         quit.target = self
         quit.image = icon("power")
@@ -855,6 +887,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         target.addItem(twin)
     }
 
+#if !KEYBOOP_LITE
     /// Подменю «Микрофон» — список устройств ввода, галочка на выбранном.
     private func microphoneSubmenu() -> NSMenuItem {
         let item = NSMenuItem(title: L10n.t("menu.mic"), action: nil, keyEquivalent: "")
@@ -895,6 +928,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     /// программа видит и почему она молчит», и исчезает оттуда, когда мешать перестало.
     @objc private func showSecureInputHelp() { onOpenPrivacy?() }
 
+#endif
     @objc private func toggleAuto() {
         let newValue = !settings.autoEnabled
         settings.autoEnabled = newValue
@@ -902,13 +936,18 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         buildMenu()
     }
 
+#if !KEYBOOP_LITE
     @objc private func selectMic(_ s: NSMenuItem) {
         if let uid = s.representedObject as? String { settings.voiceMicUID = uid; buildMenu() }
     }
+#endif
     @objc private func openSettings() { onOpenSettings?() }
+#if !KEYBOOP_LITE
     @objc private func showVoiceHistory() { onShowVoiceHistory?() }
     @objc private func checkUpdatesItem() { onCheckUpdates?() }
+#endif
 
+#if !KEYBOOP_LITE
     /// «Скопировать последнюю диктовку» (задача T40).
     ///
     /// ⚠️ Единственное место во всём приложении, где мы СОЗНАТЕЛЬНО и НЕОБРАТИМО пишем в буфер обмена.
@@ -940,6 +979,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     /// отдельно, и им нужен толчок.
     func refreshAfterPauseChange() { applyIconStyle() }
 
+#endif
     @objc private func resumePause() { Pause.stop() }
 
     /// Минуты приходят в `tag` пункта — см. сборку подменю «Не мешать».
@@ -953,9 +993,13 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         Pause.start(minutes: sender.tag)
         let f = DateFormatter(); f.dateFormat = "HH:mm"
         let until = Date().addingTimeInterval(TimeInterval(sender.tag) * 60)
+#if !KEYBOOP_LITE
         VoiceIndicator.shared.showToast(String(format: L10n.t("menu.pausedUntil"), f.string(from: until)))
+#endif
     }
+#if !KEYBOOP_LITE
     @objc private func reportProblem() { FeedbackWindowController.shared.show() }
+#endif
     @objc private func openPermissions() { Permissions.openAccessibilitySettings() }
     @objc private func openInputMonitoring() {
         // Сначала системный запрос: если macOS ещё не спрашивала, она покажет свой диалог, и
