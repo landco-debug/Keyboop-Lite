@@ -496,3 +496,26 @@ Change:
 Next:
 - inspect exactly one CI run;
 - if compilation reaches the first missing heavy dependency, remove only that boundary in S3C.
+
+
+---
+
+## Surgical Commit S3C — use the actual Lite build harness
+
+Status: IMPLEMENTED.
+
+Evidence from S3B:
+- CI path safety passed;
+- the run reached the build stage and then stopped on upstream `build-app.sh`'s intentional
+  Whisper prerequisite;
+- this was the wrong harness for the surgical target.
+
+Correction:
+- CI now invokes existing `build-lite.sh`, not upstream `build-app.sh`;
+- `build-lite.sh` already compiles the explicit retained-source allow-list with
+  `-D KEYBOOP_LITE` and deliberately has no Whisper/FluidAudio/Sparkle dependency;
+- no retained product source changed in this step.
+
+Next:
+- inspect exactly one CI run from this commit;
+- use only its first concrete compiler error for the next micro-step.

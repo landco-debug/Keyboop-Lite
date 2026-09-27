@@ -19,15 +19,15 @@ jobs:
       - name: Restore pinned upstream dictionary
         run: bash scripts/restore-words-ru.sh
 
-      - name: Build app
+      - name: Build surgical Lite app
         run: |
-          chmod +x build-app.sh
-          KEYBOOP_BUILD_APP="/private/tmp/Keyboop-Lite.app" ./build-app.sh
+          chmod +x build-lite.sh
+          KEYBOOP_LITE_APP="/private/tmp/Keyboop Lite.app" ./build-lite.sh
 
       - name: Package app
         if: success()
         run: |
-          ditto -c -k --sequesterRsrc --keepParent "/private/tmp/Keyboop-Lite.app" "$RUNNER_TEMP/Keyboop-Lite.zip"
+          ditto -c -k --sequesterRsrc --keepParent "/private/tmp/Keyboop Lite.app" "$RUNNER_TEMP/Keyboop-Lite.zip"
 
       - name: Upload artifact
         if: success()
