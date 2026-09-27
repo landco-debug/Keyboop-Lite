@@ -413,3 +413,32 @@ Build/test:
 Next:
 - S4D: isolate Engine and EventTap voice/translation/history branches; add only switching-relevant
   `Warm.swift` support already present in the source allow-list.
+
+
+---
+
+## Surgical Commit S3A — CI build probe
+
+Status: IMPLEMENTED.
+
+Purpose:
+- start the surgical rebuild in small, observable stages;
+- add a single GitHub Actions build probe before changing upstream product code;
+- use compiler/linker evidence to determine the smallest safe removal sequence.
+
+Changes:
+- added `.github/workflows/build-lite.yml`;
+- runner: `macos-26`;
+- build target: temporary `Keyboop-Lite.app`;
+- artifact upload only on successful build;
+- no source behavior changes in this step.
+
+Expected outcome:
+- the first run may fail because upstream 0.4.10's public source snapshot references heavy
+  voice/update dependencies that Lite intends to remove anyway;
+- that failure is diagnostic, not a regression.
+
+Next:
+- inspect exactly one CI run;
+- make one narrow S3B commit addressing only the first dependency boundary reported by CI;
+- repeat until the first surgical Lite binary builds.
